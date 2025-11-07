@@ -1,0 +1,241 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>Save Credentials to GitHub (vault)</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <style>
+    body{font-family:Arial,Helvetica,sans-serif;max-width:700px;margin:1.5rem auto;padding:0 1rem}
+    label{font-weight:600;margin-top:0.75rem;display:block}
+    input,button,textarea,select{display:block;width:100%;box-sizing:border-box;padding:0.5rem;margin-top:0.35rem}
+    .row{display:flex;gap:0.5rem}
+    .row .half{flex:1}
+    .inline{display:flex;align-items:center;gap:0.5rem}
+    .inline button{flex:0 0 auto;width:auto}
+    #status{margin-top:1rem;font-weight:700}
+    code{background:#f2f2f2;padding:0.1rem 0.3rem;border-radius:3px}
+  </style>
+  <!-- Use Web Crypto (built-in) - no external libs -->
+</head>
+<body>
+  <h2>Store Credential Row in <code>vault</code></h2>
+
+  <label>GitHub Personal Access Token (repo scope)</label>
+  <input id="token" type="password" placeholder="ghp_XXXX..." />
+
+  <div class="inline">
+    <button id="saveTokenBtn">Save Token Locally</button>
+    <button id="clearTokenBtn">Clear Saved Token</button>
+  </div>
+
+  <input type="hidden" id="owner" value="yblebon" />
+  <input type="hidden" id="repo" value="vault" />
+
+  <label>Website (e.g. https://example.com)</label>
+  <input id="website" type="url" placeholder="https://example.com" />
+
+  <label>Login / Username</label>
+  <input id="login" type="text" placeholder="username" />
+
+  <label>Password</label>
+  <div class="inline">
+    <input id="password" type="password" placeholder="password" />
+    <button id="togglePwdBtn">Show</button>
+    <button id="genPwdBtn">Generate</button>
+  </div>
+
+  <label>Encryption (optional)</label>
+  <div class="row">
+    <div class="half">
+      <select id="encryptSelect">
+        <option value="no">Do not encrypt</option>
+        <option value="yes">Encrypt CSV before commit</option>
+      </select>
+    </div>
+    <div class="half">
+      <input id="encPass" type="password" placeholder="Encryption password (used to derive key)" />
+    </div>
+  </div>
+  <small>When encryption is enabled, the CSV bytes are encrypted client-side with a key derived from the password using PBKDF2 (SHA-256) and AES-GCM. The file committed is the Base64 encoding of (salt + iv + ciphertext).</small>
+
+  <button id="commitBtn" style="margin-top:0.75rem">Commit to GitHub</button>
+
+  <div id="status"></div>
+
+  <script>
+  // ---------- Local token storage (simple obfuscation) ----------
+  const STORAGE_KEY = 'github_token_obf_vault';
+  function obf(s){ const a=Array.from(s).map(c=>String.fromCharCode(c.charCodeAt(0)^0x5A)).join(''); return btoa(a); }
+  function deobf(b){ try{ const a=atob(b); return Array.from(a).map(c=>String.fromCharCode(c.charCodeAt(0)^0x5A)).join(''); }catch{return '';} }
+  document.addEventListener('DOMContentLoaded', ()=> {
+    const s = localStorage.getItem(STORAGE_KEY);
+    if(s) document.getElementById('token').value = deobf(s);
+  });
+  document.getElementById('saveTokenBtn').addEventListener('click', ()=>{
+    const t = document.getElementById('token').value.trim();
+    if(!t) return setStatus('⚠️ No token to save');
+    localStorage.setItem(STORAGE_KEY, obf(t));
+    setStatus('✅ Token saved locally');
+  });
+  document.getElementById('clearTokenBtn').addEventListener('click', ()=>{
+    localStorage.removeItem(STORAGE_KEY);
+    document.getElementById('token').value = '';
+    setStatus('✅ Saved token cleared');
+  });
+
+  // ---------- Password visibility & generation ----------
+  const pwdInput = document.getElementById('password');
+  const toggleBtn = document.getElementById('togglePwdBtn');
+  toggleBtn.addEventListener('click', ()=>{
+    const isText = pwdInput.type === 'text';
+    pwdInput.type = isText ? 'password' : 'text';
+    toggleBtn.textContent = isText ? 'Show' : 'Hide';
+  });
+  document.getElementById('genPwdBtn').addEventListener('click', ()=>{
+    pwdInput.value = generatePassword(20);
+    setStatus('✅ Password generated');
+  });
+  function generatePassword(length=16){
+    const charset = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!@#$%^&*()-_=+[]{}';
+    const arr = new Uint32Array(length);
+    crypto.getRandomValues(arr);
+    let s = '';
+    for(let i=0;i<length;i++) s += charset[arr[i] % charset.length];
+    return s;
+  }
+
+  // ---------- CSV helpers ----------
+  function esc(v){ return '"' + String(v).replace(/"/g,'""') + '"'; }
+  function buildCsv(headerLine, website, login, password){
+    const line = [website, login, password].map(v=>v==null?'':v).map(v=>esc(v)).join(',');
+    return headerLine ? '"website","login","password"\n' + line + '\n' : line + '\n';
+  }
+
+  // ---------- Web Crypto: derive key (PBKDF2) and AES-GCM encrypt ----------
+  async function deriveKeyFromPassword(password, salt, iterations = 200000, length = 256){
+    const enc = new TextEncoder();
+    const pwKey = await crypto.subtle.importKey('raw', enc.encode(password), 'PBKDF2', false, ['deriveKey']);
+    const key = await crypto.subtle.deriveKey({
+      name: 'PBKDF2',
+      salt: salt,
+      iterations: iterations,
+      hash: 'SHA-256'
+    }, pwKey, { name: 'AES-GCM', length: length }, false, ['encrypt','decrypt']);
+    return key;
+  }
+
+  async function encryptBytes(plainBytes, password){
+    const salt = crypto.getRandomValues(new Uint8Array(16));
+    const iv = crypto.getRandomValues(new Uint8Array(12));
+    const key = await deriveKeyFromPassword(password, salt);
+    const cipher = await crypto.subtle.encrypt({ name: 'AES-GCM', iv: iv }, key, plainBytes);
+    // output: salt(16) || iv(12) || ciphertext
+    const ct = new Uint8Array(cipher);
+    const out = new Uint8Array(salt.byteLength + iv.byteLength + ct.byteLength);
+    out.set(salt, 0);
+    out.set(iv, salt.byteLength);
+    out.set(ct, salt.byteLength + iv.byteLength);
+    return out;
+  }
+
+  // ---------- GitHub helpers ----------
+  async function getFileSha(owner, repo, path, token){
+    const url = `https://api.github.com/repos/${owner}/${repo}/contents/${encodeURIComponent(path)}`;
+    const resp = await fetch(url, { headers: { Authorization: `token ${token}` } });
+    if(resp.status === 200) { const j = await resp.json(); return j.sha; }
+    return null;
+  }
+
+  async function getFileContent(owner, repo, path, token){
+    const url = `https://api.github.com/repos/${owner}/${repo}/contents/${encodeURIComponent(path)}?ref=main`;
+    const resp = await fetch(url, { headers: { Authorization: `token ${token}` } });
+    if(!resp.ok) return null;
+    return await resp.json();
+  }
+
+  // ---------- Main commit flow ----------
+  document.getElementById('commitBtn').addEventListener('click', commitCsv);
+
+  async function commitCsv(){
+    try{
+      setStatus('Working...');
+      const token = document.getElementById('token').value.trim();
+      const owner = document.getElementById('owner').value;
+      const repo = document.getElementById('repo').value;
+      const website = document.getElementById('website').value.trim();
+      const login = document.getElementById('login').value.trim();
+      const password = document.getElementById('password').value;
+      const encryptChoice = document.getElementById('encryptSelect').value;
+      const encPass = document.getElementById('encPass').value;
+
+      if(!token || !website || !login || !password) { setStatus('⚠️ All fields (token, website, login, password) are required'); return; }
+      if(encryptChoice === 'yes' && !encPass) { setStatus('⚠️ Provide an encryption password'); return; }
+
+      // filename domain.csv
+      const domain = domainFromUrl(website);
+      const filename = `${domain}.csv`;
+      const path = `uploads/credentials/${filename}`;
+      const branch = 'main';
+
+      // build CSV content (we prepend the new line)
+      const header = '"website","login","password"\n';
+      // check if file exists to decide whether to include header of existing file
+      const existing = await getFileContent(owner, repo, path, token);
+      let newPlain; // Uint8Array of new bytes to upload (either plaintext CSV or encrypted blob)
+      if(existing){
+        const existingText = atob(existing.content.replace(/\n/g,''));
+        const newCsvLine = buildCsv(false, website, login, password); // just one line
+        const combined = newCsvLine + existingText;
+        if(encryptChoice === 'yes'){
+          // existing file may be plaintext or previously encrypted; for simplicity we treat existing as plaintext.
+          // Encrypt combined plaintext.
+          const encBytes = await encryptBytes(new TextEncoder().encode(combined), encPass);
+          newPlain = encBytes;
+        } else {
+          newPlain = new TextEncoder().encode(combined);
+        }
+      } else {
+        const newCsv = header + buildCsv(false, website, login, password);
+        if(encryptChoice === 'yes'){
+          const encBytes = await encryptBytes(new TextEncoder().encode(newCsv), encPass);
+          newPlain = encBytes;
+        } else {
+          newPlain = new TextEncoder().encode(newCsv);
+        }
+      }
+
+      // For GitHub file storage send Base64(content). If encrypted, store Base64 of binary blob (salt+iv+cipher).
+      const contentB64 = btoa(String.fromCharCode(...newPlain));
+      const payload = {
+        message: `Add credential for ${website}`,
+        content: contentB64,
+        branch: branch
+      };
+      if(existing) payload.sha = existing.sha;
+
+      const url = `https://api.github.com/repos/${owner}/${repo}/contents/${encodeURIComponent(path)}`;
+      const resp = await fetch(url, {
+        method: 'PUT',
+        headers: { 'Authorization': `token ${token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+      if(resp.ok){
+        const j = await resp.json();
+        setStatus(`✅ Commit successful: ${j.commit.sha}`);
+      } else {
+        const err = await resp.json();
+        setStatus(`❌ Error ${resp.status}: ${err.message || JSON.stringify(err)}`);
+      }
+    }catch(e){
+      setStatus('❌ ' + (e && e.message ? e.message : String(e)));
+    }
+  }
+
+  function domainFromUrl(url){
+    try{ return new URL(url).hostname.replace(/^www\./,''); }catch{ return url.replace(/^https?:\/\//,'').split(/[/?#]/)[0]; }
+  }
+
+  function setStatus(s){ document.getElementById('status').textContent = s; }
+  </script>
+</body>
+</html>
