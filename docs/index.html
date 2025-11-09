@@ -1,301 +1,787 @@
-<!doctype html>
-<html>
+<!DOCTYPE html>
+<html lang="en">
 <head>
-  <meta charset="utf-8" />
-  <title>Encrypt CSV + GitHub (vault/main/uploads/credentials)</title>
-  <style>
-    body { font-family: system-ui, Arial; max-width: 900px; margin: 2rem; }
-    label, button { display:block; margin: .5rem 0; }
-    #status { margin-top: 1rem; color: #444; white-space: pre-wrap; }
-    .grid { display:grid; grid-template-columns: 1fr 1fr 1fr; gap: .5rem; }
-    fieldset { padding: .5rem; border: 1px solid #ddd; }
-  </style>
+<meta charset="UTF-8">
+<title>Secure Password Vault</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+<style>
+    :root {
+        --bg: #f8f9fa;
+        --card-bg: #ffffff;
+        --text: #212529;
+        --border: #dee2e6;
+        --primary: #0d6efd;
+        --success: #198754;
+        --danger: #dc3545;
+        --warning: #ffc107;
+        --shadow: 0 4px 12px rgba(0,0,0,0.08);
+    }
+    * { box-sizing: border-box; margin:0; padding:0; }
+    body {
+        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        background: var(--bg);
+        color: var(--text);
+        line-height: 1.6;
+        padding: 20px;
+    }
+    .container {
+        max-width: 1000px;
+        margin: 0 auto;
+        display: flex;
+        flex-direction: column;
+        gap: 24px;
+    }
+    .card {
+        background: var(--card-bg);
+        border-radius: 12px;
+        box-shadow: var(--shadow);
+        padding: 24px;
+        border: 1px solid var(--border);
+    }
+    h1 {
+        text-align: center;
+        font-size: 2rem;
+        margin-bottom: 8px;
+        color: #000;
+    }
+    .subtitle {
+        text-align: center;
+        color: #555;
+        font-size: 1rem;
+        margin-bottom: 20px;
+    }
+    .form-group {
+        margin-bottom: 16px;
+    }
+    label {
+        display: block;
+        font-weight: 600;
+        margin-bottom: 6px;
+        font-size: 0.95rem;
+    }
+    input, textarea {
+        width: 100%;
+        padding: 12px;
+        border: 1.5px solid var(--border);
+        border-radius: 8px;
+        font-family: 'Courier New', monospace;
+        font-size: 1rem;
+        transition: border 0.2s;
+    }
+    input:focus, textarea:focus {
+        outline: none;
+        border-color: var(--primary);
+        box-shadow: 0 0 0 3px rgba(13,110,253,0.15);
+    }
+    textarea { min-height: 120px; resize: vertical; }
+    button {
+        cursor: pointer;
+        font-weight: 600;
+        border: none;
+        border-radius: 8px;
+        padding: 10px 16px;
+        font-size: 0.95rem;
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        transition: all 0.2s;
+    }
+    .btn-primary {
+        background: #000;
+        color: #fff;
+    }
+    .btn-primary:hover { background: #333; }
+    .btn-success {
+        background: var(--success);
+        color: #fff;
+    }
+    .btn-success:hover { background: #146c43; }
+    .btn-outline {
+        background: transparent;
+        border: 1.5px solid #000;
+        color: #000;
+    }
+    .btn-outline:hover {
+        background: #000;
+        color: #fff;
+    }
+    .btn-small {
+        padding: 6px 10px;
+        font-size: 0.8rem;
+    }
+    .input-group {
+        position: relative;
+    }
+    .input-group .btn {
+        position: absolute;
+        right: 8px;
+        top: 50%;
+        transform: translateY(-50%);
+    }
+    .grid-3 {
+        display: grid;
+        grid-template-columns: 1fr 1fr 1fr;
+        gap: 12px;
+    }
+    .flex-between {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        flex-wrap: wrap;
+        gap: 12px;
+    }
+    .flex-center {
+        display: flex;
+        justify-content: center;
+        gap: 12px;
+        margin-top: 16px;
+    }
+    table {
+        width: 100%;
+        border-collapse: collapse;
+        margin-top: 16px;
+        font-size: 0.95rem;
+    }
+    th {
+        background: #f1f3f5;
+        text-align: left;
+        padding: 12px;
+        border-bottom: 2px solid var(--border);
+        font-weight: 600;
+    }
+    td {
+        padding: 12px;
+        border-bottom: 1px solid var(--border);
+        vertical-align: middle;
+    }
+    .password-cell {
+        font-family: 'Courier New', monospace;
+        position: relative;
+    }
+    .password-text {
+        letter-spacing: 1px;
+    }
+    .copy-btn, .password-toggle {
+        font-size: 0.8rem;
+        padding: 4px 8px;
+        margin-left: 6px;
+    }
+    .copy-btn {
+        background: #e9ecef;
+        display: none;
+    }
+    .output {
+        background: #f8f9fa;
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        padding: 16px;
+        margin-top: 16px;
+        font-family: monospace;
+        max-height: 300px;
+        overflow: auto;
+        display: none;
+    }
+    .hidden { display: none !important; }
+    .text-center { text-align: center; }
+    .mt-1 { margin-top: 8px; }
+    .mb-2 { margin-bottom: 16px; }
+    .github-card {
+        border-left: 4px solid var(--primary);
+    }
+    .token-status {
+        font-size: 0.85rem;
+        margin-top: 8px;
+        color: #555;
+    }
+    .token-saved { color: var(--success); }
+    .token-notsaved { color: var(--warning); }
+    .action-bar {
+        display: flex;
+        justify-content: center;
+        gap: 16px;
+        flex-wrap: wrap;
+        padding: 16px 0;
+    }
+    .info {
+        font-size: 0.85rem;
+        color: #666;
+    }
+    @media (max-width: 768px) {
+        .grid-3 { grid-template-columns: 1fr; }
+        .flex-between { flex-direction: column; align-items: stretch; }
+    }
+</style>
 </head>
 <body>
-  <h1>Encrypt CSV — create credentials or upload file — PBKDF2(SHA-256) + AES-GCM + GitHub</h1>
+<div class="container">
 
-  <fieldset>
-    <legend>Mode</legend>
-    <label><input type="radio" name="mode" value="file" checked> File upload (choose a file to encrypt)</label>
-    <label><input type="radio" name="mode" value="create"> Create CSV from credentials (enter login, password & website or upload CSV)</label>
-  </fieldset>
-
-  <div id="file-section">
-    <label>Choose file:
-      <input id="file" type="file" />
-    </label>
-  </div>
-
-  <div id="create-section" style="display:none; border:1px solid #eee; padding:.5rem; margin-top:.5rem;">
-    <div class="grid">
-      <label>Login:
-        <input id="cred-login" type="text" placeholder="user@example.com" />
-      </label>
-      <label>Password:
-        <input id="cred-password" type="text" placeholder="secret" />
-      </label>
-      <label>Website:
-        <input id="cred-website" type="text" placeholder="https://example.com" />
-      </label>
+    <!-- 1. Header -->
+    <div class="card text-center">
+        <h1>Secure Password Vault</h1>
+        <p class="subtitle">Offline • AES-GCM • PBKDF2 • GitHub Sync</p>
     </div>
-    <div style="margin-top:.5rem;">
-      <label>Or upload a CSV containing headers "login", "password" and optionally "website" (case-insensitive). The first matching row will be used:
-        <input id="cred-csv" type="file" accept=".csv,text/csv" />
-      </label>
+
+    <!-- 2. Master Password -->
+    <div class="card">
+        <div class="form-group">
+            <label for="masterPassword">Master Password</label>
+            <div class="input-group">
+                <input type="password" id="masterPassword" placeholder="Used for encryption & decryption">
+                <button id="toggleMaster" class="btn btn-outline btn-small">Show</button>
+                <button id="copyMaster" class="btn btn-secondary btn-small copy-btn">Copy</button>
+            </div>
+            <div class="flex-center mt-1">
+                <button id="genMaster" class="btn btn-outline">Generate Strong Master</button>
+            </div>
+        </div>
     </div>
-    <div style="font-size:90%; color:#555; margin-top:.5rem;">
-      Generated CSV will use header: <strong>login,password,website</strong>.
+
+    <!-- 3. Mode Tabs -->
+    <div class="card action-bar">
+        <button id="tabEncrypt" class="btn btn-primary">Encrypt Mode</button>
+        <button id="tabDecrypt" class="btn btn-outline">Decrypt Mode</button>
     </div>
-  </div>
 
-  <label>Password for encryption:
-    <input id="password" type="password" />
-  </label>
+    <!-- 4. ENCRYPT MODE -->
+    <div id="encryptMode">
+        <!-- Input Card -->
+        <div class="card">
+            <h3>Add New Entry</h3>
+            <div class="grid-3">
+                <div class="form-group">
+                    <label for="website">Website</label>
+                    <input type="text" id="website" placeholder="example.com">
+                </div>
+                <div class="form-group">
+                    <label for="login">Login / Email</label>
+                    <input type="text" id="login" placeholder="user@example.com">
+                </div>
+                <div class="form-group">
+                    <label for="password">Password</label>
+                    <div class="input-group">
+                        <input type="password" id="password" placeholder="••••••••">
+                        <button id="genPass" class="btn btn-outline btn-small">Gen</button>
+                    </div>
+                </div>
+            </div>
+            <div class="flex-center mt-1">
+                <button id="addEntry" class="btn btn-primary">Add Entry</button>
+            </div>
+        </div>
 
-  <label>PBKDF2 iterations:
-    <input id="iters" type="number" value="200000" min="1" />
-  </label>
+        <!-- Table + Output -->
+        <div class="card">
+            <table id="entryTable">
+                <thead>
+                    <tr>
+                        <th>Website</th>
+                        <th>Login</th>
+                        <th>Password</th>
+                        <th style="width:160px;">Actions</th>
+                    </tr>
+                </thead>
+                <tbody></tbody>
+            </table>
 
-  <fieldset>
-    <legend>Output destination</legend>
-    <label><input type="radio" name="dest" value="download" checked> Download locally</label>
-    <label><input type="radio" name="dest" value="github"> Upload to GitHub (vault/main/uploads/credentials)</label>
-  </fieldset>
+            <div id="encryptOutput" class="output">
+                <strong>Encrypted Data (Base64):</strong><br>
+                <span id="encryptedText" style="word-break:break-all;"></span>
+                <div class="flex-center" style="margin-top:12px;">
+                    <button id="copyEncrypted" class="btn btn-outline">Copy</button>
+                    <button id="downloadEnc" class="btn btn-outline">Download .txt</button>
+                </div>
+            </div>
+        </div>
 
-  <div id="github-fields" style="display:none; border:1px solid #ddd; padding:.5rem; margin-top:.5rem;">
-    <div class="grid" style="grid-template-columns: 1fr 1fr;">
-      <label>GitHub token (personal access token):
-        <input id="gh-token" type="password" placeholder="ghp_xxx..." />
-      </label>
-      <label>Owner (user or org):
-        <input id="gh-owner" type="text" placeholder="username or org" />
-      </label>
+        <!-- Action Buttons -->
+        <div class="card">
+            <div class="flex-between">
+                <button id="encryptDownloadBtn" class="btn btn-success">Encrypt & Download</button>
+                <button id="encryptGithubBtn" class="btn btn-success">Encrypt & GitHub Upload</button>
+                <button id="clearAll" class="btn btn-outline">Clear All</button>
+            </div>
+        </div>
     </div>
-    <label>Optional filename suffix (e.g., .enc or timestamp will be appended):
-      <input id="gh-suffix" type="text" placeholder=".enc" value=".enc" />
-    </label>
-    <label>Commit message:
-      <input id="gh-message" type="text" placeholder="Add encrypted file" value="Add encrypted file via web UI" />
-    </label>
-    <div style="margin-top:.5rem; font-size:90%; color:#555;">
-      Repo: <strong>vault</strong> — Branch: <strong>main</strong> — Path prefix: <strong>uploads/credentials</strong>
+
+    <!-- 5. DECRYPT MODE -->
+    <div id="decryptMode" class="hidden">
+        <div class="card">
+            <h3>Paste Encrypted Data</h3>
+            <div class="form-group">
+                <textarea id="encryptedInput" placeholder="Paste your encrypted Base64 string here..."></textarea>
+            </div>
+            <div class="flex-center">
+                <button id="decryptBtn" class="btn btn-success">Decrypt & View</button>
+                <button id="clearDecrypt" class="btn btn-outline">Clear</button>
+            </div>
+
+            <div id="decryptOutput" class="output">
+                <strong id="decTitle">Decrypted CSV:</strong><br>
+                <pre id="csvText"></pre>
+                <div class="flex-center">
+                    <button id="downloadCsv" class="btn btn-outline">Download CSV</button>
+                </div>
+            </div>
+
+            <table id="decryptTable" style="margin-top:20px;display:none;">
+                <thead>
+                    <tr>
+                        <th>Website</th>
+                        <th>Login</th>
+                        <th>Password</th>
+                    </tr>
+                </thead>
+                <tbody></tbody>
+            </table>
+        </div>
     </div>
-  </div>
 
-  <button id="encrypt">Encrypt & proceed</button>
+    <!-- 6. GitHub Sync (Editable!) -->
+    <div class="card github-card" id="githubSection" style="display:none;">
+        <h3 style="margin-bottom:16px;">GitHub Upload</h3>
+        <div class="form-group">
+            <label for="githubToken">GitHub Token (repo scope)</label>
+            <div class="input-group">
+                <input type="password" id="githubToken" placeholder="ghp_...">
+                <button id="toggleToken" class="btn btn-outline btn-small">Show</button>
+            </div>
+            <div id="tokenStatus" class="token-status token-notsaved">
+                Token not saved. Enter and save.
+            </div>
+        </div>
+        <div class="form-group">
+            <label for="githubUser">GitHub User / Org</label>
+            <input type="text" id="githubUser" placeholder="your-username">
+        </div>
+        <div class="grid-3">
+            <div class="form-group">
+                <label for="githubRepo">Repository</label>
+                <input type="text" id="githubRepo" placeholder="my-vault">
+            </div>
+            <div class="form-group">
+                <label for="githubPath">File Path</label>
+                <input type="text" id="githubPath" value="uploads/credentials/vault.csv" placeholder="path/to/vault.csv">
+            </div>
+            <div class="form-group" style="align-self:end;">
+                <button id="uploadToGithub" class="btn btn-success" style="width:100%;">Upload CSV</button>
+            </div>
+        </div>
+        <div class="flex-center mt-1">
+            <button id="saveToken" class="btn btn-outline">Save Token Securely</button>
+            <button id="clearToken" class="btn btn-outline">Clear Saved Token</button>
+        </div>
+        <p class="info">
+            File will be saved at:<br>
+            <code id="previewPath">uploads/credentials/vault.csv</code>
+        </p>
+    </div>
+    <div class="flex-center">
+        <button id="toggleGithub" class="btn btn-outline">Toggle GitHub Sync</button>
+    </div>
 
-  <div id="status"></div>
+</div>
 
 <script>
-const BUF = (n) => new Uint8Array(n);
-function randBytes(n){ const b = new Uint8Array(n); crypto.getRandomValues(b); return b; }
+/* ---------- CONFIG ---------- */
+const PBKDF2_ITERATIONS = 200000;
+const KEY_LEN = 32;
+const SALT_LEN = 16;
+const IV_LEN = 12;
+const TAG_LEN = 16;
+const GITHUB_BRANCH = 'main';
+const GITHUB_COMMIT_MESSAGE = 'Update encrypted vault (CSV)';
 
-async function deriveKey(password, salt, iterations, length=32){
-  const enc = new TextEncoder();
-  const pwKey = await crypto.subtle.importKey("raw", enc.encode(password), {name:"PBKDF2"}, false, ["deriveBits"]);
-  const derivedBits = await crypto.subtle.deriveBits(
-    { name: "PBKDF2", salt: salt, iterations: iterations, hash: "SHA-256" },
-    pwKey,
-    length * 8
-  );
-  return crypto.subtle.importKey("raw", derivedBits, { name: "AES-GCM" }, false, ["encrypt","decrypt"]);
-}
-function concatUint8Arrays(arrays){
-  const total = arrays.reduce((s,a)=>s+a.length,0);
-  const out = new Uint8Array(total);
-  let offset=0;
-  for(const a of arrays){ out.set(a, offset); offset += a.length; }
-  return out;
-}
-function toBase64(u8){
-  let CHUNK = 0x8000;
-  let index = 0;
-  let res = '';
-  while(index < u8.length){
-    let slice = u8.subarray(index, Math.min(index + CHUNK, u8.length));
-    res += String.fromCharCode.apply(null, slice);
-    index += CHUNK;
-  }
-  return btoa(res);
+/* ---------- INDEXEDDB ---------- */
+let db;
+const DB_NAME = 'PasswordVaultDB';
+const DB_VERSION = 1;
+const STORE_NAME = 'githubTokens';
+
+function openDB() {
+    return new Promise((resolve, reject) => {
+        const req = indexedDB.open(DB_NAME, DB_VERSION);
+        req.onupgradeneeded = e => {
+            const db = e.target.result;
+            if (!db.objectStoreNames.contains(STORE_NAME)) {
+                db.createObjectStore(STORE_NAME, { keyPath: 'id' });
+            }
+        };
+        req.onsuccess = e => { db = e.target.result; resolve(db); };
+        req.onerror = e => reject(e.target.error);
+    });
 }
 
-function parseCSVFirstRowWithHeaders(csvText, headers){
-  const lines = csvText.split(/\r?\n/).map(l=>l.trim()).filter(l=>l.length>0);
-  if(lines.length === 0) return null;
-  const headerLine = lines[0];
-  const cols = headerLine.split(',').map(h=>h.trim().replace(/^"|"$/g,'').toLowerCase());
-  const idx = {};
-  for(let i=0;i<cols.length;i++) idx[cols[i]] = i;
-  const needed = headers.map(h=>h.toLowerCase());
-  // website is optional, include if present
-  for(const h of ['login','password']) if(!(h in idx)) return null;
-  const outRow = { login: '', password: '', website: '' };
-  for(let r=1;r<lines.length;r++){
-    const parts = lines[r].match(/(".*?"|[^",\s]+)(?=\s*,|\s*$)/g) || [];
-    if(parts.length < Object.keys(idx).length) continue;
-    outRow.login = parts[idx['login']].replace(/^"|"$/g,'') || '';
-    outRow.password = parts[idx['password']].replace(/^"|"$/g,'') || '';
-    outRow.website = (idx['website'] !== undefined) ? (parts[idx['website']].replace(/^"|"$/g,'') || '') : '';
-    return outRow;
-  }
-  return null;
+async function saveTokenEncrypted(token, masterPass) {
+    const salt = crypto.getRandomValues(new Uint8Array(16));
+    const key = await crypto.subtle.deriveKey(
+        { name: 'PBKDF2', salt, iterations: 100000, hash: 'SHA-256' },
+        await crypto.subtle.importKey('raw', new TextEncoder().encode(masterPass), 'PBKDF2', false, ['deriveKey']),
+        { name: 'AES-GCM', length: 256 }, false, ['encrypt']
+    );
+    const iv = crypto.getRandomValues(new Uint8Array(12));
+    const data = new TextEncoder().encode(token);
+    const ct = await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, key, data);
+    const encrypted = new Uint8Array(salt.byteLength + iv.byteLength + ct.byteLength);
+    encrypted.set(salt, 0);
+    encrypted.set(iv, salt.byteLength);
+    encrypted.set(new Uint8Array(ct), salt.byteLength + iv.byteLength);
+    return btoa(String.fromCharCode(...encrypted));
 }
 
-document.querySelectorAll('input[name="mode"]').forEach(r=>{
-  r.addEventListener('change', ()=> {
-    document.getElementById('file-section').style.display = (r.value === 'file' && r.checked) ? 'block' : 'none';
-    document.getElementById('create-section').style.display = (r.value === 'create' && r.checked) ? 'block' : 'none';
-  });
-});
-document.querySelectorAll('input[name="dest"]').forEach(r=>{
-  r.addEventListener('change', ()=> {
-    document.getElementById('github-fields').style.display = (r.value === 'github' && r.checked) ? 'block' : 'none';
-  });
-});
-
-async function buildCredentialsCSVFromInputs(statusEl){
-  const login = document.getElementById('cred-login').value.trim();
-  const password = document.getElementById('cred-password').value;
-  const website = document.getElementById('cred-website').value.trim();
-  const fileInput = document.getElementById('cred-csv');
-  if(login && password){
-    const esc = (s)=>`"${String(s).replace(/"/g,'""')}"`;
-    const csvText = `login,password,website\n${esc(login)},${esc(password)},${esc(website)}\n`;
-    return { name: `credentials_${Date.now()}.csv`, data: new TextEncoder().encode(csvText) };
-  }
-  if(fileInput.files.length){
-    statusEl.textContent = 'Reading uploaded CSV to extract first login/password/website...';
-    const txt = await fileInput.files[0].text();
-    const row = parseCSVFirstRowWithHeaders(txt, ['login','password','website']);
-    if(!row) throw new Error('Uploaded CSV did not contain headers "login" and "password" or had no valid rows.');
-    const esc = (s)=>`"${String(s||'').replace(/"/g,'""')}"`;
-    const csvText = `login,password,website\n${esc(row.login)},${esc(row.password)},${esc(row.website||'')}\n`;
-    return { name: fileInput.files[0].name, data: new TextEncoder().encode(csvText) };
-  }
-  throw new Error('Provide login and password (and optional website) or upload a CSV with headers "login" and "password".');
+async function loadTokenDecrypted(encryptedB64, masterPass) {
+    const bin = Uint8Array.from(atob(encryptedB64), c => c.charCodeAt(0));
+    const salt = bin.slice(0, 16);
+    const iv = bin.slice(16, 28);
+    const ct = bin.slice(28);
+    const key = await crypto.subtle.deriveKey(
+        { name: 'PBKDF2', salt, iterations: 100000, hash: 'SHA-256' },
+        await crypto.subtle.importKey('raw', new TextEncoder().encode(masterPass), 'PBKDF2', false, ['deriveKey']),
+        { name: 'AES-GCM', length: 256 }, false, ['decrypt']
+    );
+    const pt = await crypto.subtle.decrypt({ name: 'AES-GCM', iv }, key, ct);
+    return new TextDecoder().decode(pt);
 }
 
-async function encryptBuffer(plainU8, password, iterations, statusEl){
-  statusEl.textContent = 'Generating salt & nonce...';
-  const salt = randBytes(16);
-  const nonce = randBytes(12);
+/* ---------- DOM ---------- */
+const masterPassInp   = document.getElementById('masterPassword');
+const toggleMasterBtn = document.getElementById('toggleMaster');
+const copyMasterBtn   = document.getElementById('copyMaster');
+const genMasterBtn    = document.getElementById('genMaster');
+const tabEncrypt      = document.getElementById('tabEncrypt');
+const tabDecrypt      = document.getElementById('tabDecrypt');
+const encryptMode     = document.getElementById('encryptMode');
+const decryptMode     = document.getElementById('decryptMode');
+const encryptDownloadBtn = document.getElementById('encryptDownloadBtn');
+const encryptGithubBtn   = document.getElementById('encryptGithubBtn');
+const clearAllBtn     = document.getElementById('clearAll');
 
-  statusEl.textContent = 'Deriving key (PBKDF2 SHA-256)...';
-  const aesKey = await deriveKey(password, salt, iterations, 32);
+/* ENCRYPT */
+const websiteInp = document.getElementById('website');
+const loginInp   = document.getElementById('login');
+const passInp    = document.getElementById('password');
+const genPassBtn = document.getElementById('genPass');
+const addBtn     = document.getElementById('addEntry');
+const tableBody  = document.querySelector('#entryTable tbody');
+const encOut     = document.getElementById('encryptOutput');
+const encText    = document.getElementById('encryptedText');
+const copyEncBtn = document.getElementById('copyEncrypted');
+const dlEncBtn   = document.getElementById('downloadEnc');
 
-  statusEl.textContent = 'Encrypting (AES-GCM)...';
-  const alg = { name: "AES-GCM", iv: nonce, tagLength: 128 };
-  const encrypted = await crypto.subtle.encrypt(alg, aesKey, plainU8);
-  const encryptedU8 = new Uint8Array(encrypted);
+/* DECRYPT */
+const encInput   = document.getElementById('encryptedInput');
+const decryptBtn = document.getElementById('decryptBtn');
+const clearDecBtn= document.getElementById('clearDecrypt');
+const decOut     = document.getElementById('decryptOutput');
+const decTitle   = document.getElementById('decTitle');
+const csvPre     = document.getElementById('csvText');
+const dlCsvBtn   = document.getElementById('downloadCsv');
+const decTable   = document.getElementById('decryptTable');
+const decTBody   = decTable.querySelector('tbody');
 
-  const outBuf = concatUint8Arrays([salt, nonce, encryptedU8]);
-  return outBuf;
+/* GITHUB */
+const toggleGithubBtn = document.getElementById('toggleGithub');
+const githubSection   = document.getElementById('githubSection');
+const githubTokenInp  = document.getElementById('githubToken');
+const toggleTokenBtn  = document.getElementById('toggleToken');
+const githubUserInp   = document.getElementById('githubUser');
+const githubRepoInp   = document.getElementById('githubRepo');
+const githubPathInp   = document.getElementById('githubPath');
+const uploadGithubBtn = document.getElementById('uploadToGithub');
+const saveTokenBtn    = document.getElementById('saveToken');
+const clearTokenBtn   = document.getElementById('clearToken');
+const tokenStatus     = document.getElementById('tokenStatus');
+const previewPath     = document.getElementById('previewPath');
+
+/* ---------- STATE ---------- */
+let entries = [];
+let savedTokenEncrypted = null;
+
+/* ---------- UTILS ---------- */
+function escHTML(t){const d=document.createElement('div');d.textContent=t;return d.innerHTML;}
+function genStrong(len=16){
+    const chars = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%^&*()_+~`|}{[]:;?><,./-=";
+    const arr = new Uint8Array(len);
+    crypto.getRandomValues(arr);
+    return Array.from(arr,x=>chars[x%chars.length]).join('');
 }
-
-async function githubGetFileSha(owner, repo, path, branch, token){
-  const url = `https://api.github.com/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/contents/${encodeURIComponent(path)}?ref=${encodeURIComponent(branch)}`;
-  const res = await fetch(url, { headers: { Authorization: `token ${token}`, Accept: 'application/vnd.github.v3+json' }});
-  if(res.status === 200){
-    const j = await res.json();
-    return j.sha;
-  }
-  if(res.status === 404) return null;
-  const txt = await res.text();
-  throw new Error(`GitHub GET error: ${res.status} ${txt}`);
+async function copy(txt){
+    try{await navigator.clipboard.writeText(txt);return true;}
+    catch(e){console.error(e);return false;}
 }
-
-async function uploadToGitHub(owner, repo, path, branch, token, contentBase64, message, sha, statusEl){
-  const url = `https://api.github.com/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/contents/${encodeURIComponent(path)}`;
-  const body = { message, content: contentBase64, branch };
-  if(sha) body.sha = sha;
-  statusEl.textContent = 'Uploading to GitHub...';
-  const res = await fetch(url, {
-    method: 'PUT',
-    headers: { Authorization: `token ${token}`, Accept: 'application/vnd.github.v3+json', 'Content-Type':'application/json' },
-    body: JSON.stringify(body)
-  });
-  if(!res.ok){
-    const txt = await res.text();
-    throw new Error(`GitHub upload failed: ${res.status} ${txt}`);
-  }
-  return res.json();
-}
-
-document.getElementById('encrypt').addEventListener('click', async ()=>{
-  const status = document.getElementById('status');
-  status.textContent = '';
-  try{
-    const mode = document.querySelector('input[name="mode"]:checked').value;
-    const encPassword = document.getElementById('password').value || '';
-    const iterations = parseInt(document.getElementById('iters').value) || 200000;
-    if(!encPassword) { status.textContent = 'Enter encryption password.'; return; }
-
-    let filename, plainU8;
-    if(mode === 'file'){
-      const fi = document.getElementById('file');
-      if(!fi.files.length){ status.textContent = 'Select a file.'; return; }
-      filename = fi.files[0].name;
-      status.textContent = 'Reading file...';
-      plainU8 = new Uint8Array(await fi.files[0].arrayBuffer());
-    }else{
-      const csv = await buildCredentialsCSVFromInputs(status);
-      filename = csv.name;
-      plainU8 = csv.data;
+function updatePreviewPath() {
+    const user = githubUserInp.value.trim();
+    const repo = githubRepoInp.value.trim();
+    const path = githubPathInp.value.trim();
+    if (user && repo && path) {
+        previewPath.textContent = `${user}/${repo}/blob/${GITHUB_BRANCH}/${path}`;
+    } else {
+        previewPath.textContent = 'Enter user, repo, and path';
     }
+}
 
-    const outBuf = await encryptBuffer(plainU8, encPassword, iterations, status);
-
-    const dest = document.querySelector('input[name="dest"]:checked').value;
-    if(dest === 'download'){
-      status.textContent = 'Preparing download...';
-      const blob = new Blob([outBuf], {type: 'application/octet-stream'});
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = filename + '.enc';
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-      URL.revokeObjectURL(url);
-      status.textContent = `Done. Download started (file: ${a.download}).\nFormat: salt(16)||nonce(12)||ciphertext||tag(16).\nPBKDF2 iterations: ${iterations}`;
-      return;
+/* ---------- MASTER PASSWORD ---------- */
+toggleMasterBtn.onclick = () => {
+    if (masterPassInp.type === 'password') {
+        masterPassInp.type = 'text';
+        toggleMasterBtn.textContent = 'Hide';
+        copyMasterBtn.style.display = 'inline-flex';
+    } else {
+        masterPassInp.type = 'password';
+        toggleMasterBtn.textContent = 'Show';
+        copyMasterBtn.style.display = 'none';
+        copyMasterBtn.innerHTML = 'Copy';
     }
-
-    // GitHub upload path (hardcoded repo/branch/path prefix)
-    const token = document.getElementById('gh-token').value.trim();
-    const owner = document.getElementById('gh-owner').value.trim();
-    const suffix = document.getElementById('gh-suffix').value || '.enc';
-    const message = document.getElementById('gh-message').value.trim() || `Add ${filename}${suffix}`;
-
-    if(!token || !owner){
-      status.textContent = 'Fill GitHub token and owner.';
-      return;
+};
+copyMasterBtn.onclick = async () => {
+    const pwd = masterPassInp.value;
+    if (!pwd) return alert("No password");
+    if (await copy(pwd)) {
+        const orig = copyMasterBtn.innerHTML;
+        copyMasterBtn.innerHTML = 'Copied!';
+        setTimeout(() => copyMasterBtn.innerHTML = orig, 1500);
     }
+};
 
-    const repo = 'vault';
-    const branch = 'main';
-    const pathPrefix = 'uploads/credentials';
-    const safeFilename = filename.replace(/^.*[\\/]/,''); // strip dirs
-    const fullPath = pathPrefix.replace(/\/$/,'') + '/' + (safeFilename + suffix).replace(/^\/+/,'');
+/* ---------- TOKEN ---------- */
+toggleTokenBtn.onclick = () => {
+    githubTokenInp.type = githubTokenInp.type === 'password' ? 'text' : 'password';
+    toggleTokenBtn.textContent = githubTokenInp.type === 'text' ? 'Hide' : 'Show';
+};
 
-    status.textContent = 'Preparing file for upload (base64)...';
-    const contentBase64 = toBase64(outBuf);
+async function saveTokenToDB() {
+    const token = githubTokenInp.value.trim();
+    const master = masterPassInp.value;
+    if (!token || !master) return alert('Enter token and master password');
+    try {
+        const encrypted = await saveTokenEncrypted(token, master);
+        await openDB();
+        const tx = db.transaction(STORE_NAME, 'readwrite');
+        tx.objectStore(STORE_NAME).put({ id: 'github', token: encrypted });
+        await tx.done;
+        savedTokenEncrypted = encrypted;
+        tokenStatus.textContent = 'Token saved securely!';
+        tokenStatus.className = 'token-status token-saved';
+    } catch (e) { alert('Save failed: ' + e.message); }
+}
 
-    status.textContent = 'Checking existing file on GitHub (to get SHA if updating)...';
-    let sha = null;
-    try{
-      sha = await githubGetFileSha(owner, repo, fullPath, branch, token);
-    }catch(err){
-      throw err;
+async function loadTokenFromDB() {
+    const master = masterPassInp.value;
+    if (!master) return;
+    try {
+        await openDB();
+        const tx = db.transaction(STORE_NAME, 'readonly');
+        const req = tx.objectStore(STORE_NAME).get('github');
+        req.onsuccess = async () => {
+            if (req.result) {
+                try {
+                    const decrypted = await loadTokenDecrypted(req.result.token, master);
+                    githubTokenInp.value = decrypted;
+                    savedTokenEncrypted = req.result.token;
+                    tokenStatus.textContent = 'Token loaded';
+                    tokenStatus.className = 'token-status token-saved';
+                } catch (e) {
+                    tokenStatus.textContent = 'Wrong master password';
+                    tokenStatus.className = 'token-status token-notsaved';
+                }
+            }
+        };
+    } catch (e) { console.error(e); }
+}
+
+async function clearSavedToken() {
+    if (!confirm('Delete saved token?')) return;
+    try {
+        await openDB();
+        const tx = db.transaction(STORE_NAME, 'readwrite');
+        tx.objectStore(STORE_NAME).delete('github');
+        await tx.done;
+        savedTokenEncrypted = null;
+        githubTokenInp.value = '';
+        tokenStatus.textContent = 'Token cleared';
+        tokenStatus.className = 'token-status token-notsaved';
+    } catch (e) { alert('Clear failed'); }
+}
+
+/* ---------- GITHUB UPLOAD (FIXED!) ---------- */
+async function uploadToGitHubAsCSV(encryptedBase64, user, repo, path, token) {
+    const url = `https://api.github.com/repos/${user}/${repo}/contents/${path}`;
+    const headers = {
+        'Authorization': `Bearer ${token}`,
+        'Accept': 'application/vnd.github+json',
+        'X-GitHub-Api-Version': '2022-11-28'
+    };
+
+    // Create CSV content: single cell with Base64
+    const csvContent = `"${encryptedBase64}"`;
+    const base64Content = btoa(unescape(encodeURIComponent(csvContent))); // UTF-8 safe
+
+    try {
+        const getRes = await fetch(url, { headers });
+        let body;
+
+        if (getRes.status === 404) {
+            body = { message: GITHUB_COMMIT_MESSAGE, content: base64Content, branch: GITHUB_BRANCH };
+        } else if (getRes.ok) {
+            const data = await getRes.json();
+            body = { message: GITHUB_COMMIT_MESSAGE, content: base64Content, sha: data.sha, branch: GITHUB_BRANCH };
+        } else {
+            throw new Error(`GitHub API error: ${getRes.status}`);
+        }
+
+        const putRes = await fetch(url, { method: 'PUT', headers, body: JSON.stringify(body) });
+        if (putRes.ok) {
+            alert(`Uploaded to GitHub!\n${user}/${repo}/blob/${GITHUB_BRANCH}/${path}`);
+        } else {
+            const err = await putRes.text();
+            throw new Error(err);
+        }
+    } catch (e) {
+        alert(`Upload failed: ${e.message}`);
     }
+}
 
-    const resp = await uploadToGitHub(owner, repo, fullPath, branch, token, contentBase64, message, sha, status);
-    status.textContent = `Upload successful. File URL: ${resp.content.html_url || '(no html_url returned)'}\nRepo: ${owner}/vault\nPath: ${fullPath}\nBranch: main\nPBKDF2 iterations: ${iterations}\nFormat: salt(16)||nonce(12)||ciphertext||tag(16)`;
-  }catch(err){
-    status.textContent = 'Error: ' + (err.message || String(err));
-    console.error(err);
-  }
-});
+/* ---------- ENCRYPT ---------- */
+function addRow(w,l,p){
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+        <td>${escHTML(w)}</td>
+        <td>${escHTML(l)}</td>
+        <td class="password-cell"><span class="password-text">••••••••</span><button class="btn btn-outline btn-small copy-btn">Copy</button></td>
+        <td>
+            <button class="btn btn-outline btn-small password-toggle" data-pwd="${escHTML(p)}">Show</button>
+            <button class="btn btn-outline btn-small" style="background:#dc3545;color:#fff;" onclick="this.closest('tr').remove();syncEntries();">Delete</button>
+        </td>`;
+    tr.querySelector('.password-toggle').onclick = () => toggleShow(tr.querySelector('.password-toggle'));
+    tr.querySelector('.copy-btn').onclick = () => copyPass(tr.querySelector('.copy-btn'), p);
+    tableBody.appendChild(tr);
+    syncEntries();
+}
+function syncEntries(){
+    entries = Array.from(tableBody.rows).map(r => {
+        const t = r.cells[3].querySelector('.password-toggle');
+        return {website: r.cells[0].textContent, login: r.cells[1].textContent, password: t.dataset.pwd};
+    });
+}
+function makeCSV(){
+    if (!entries.length) return '';
+    let csv = 'Website,Login,Password\n';
+    entries.forEach(e => csv += `"${e.website.replace(/"/g,'""')}","${e.login.replace(/"/g,'""')}","${e.password.replace(/"/g,'""')}"\n`);
+    return csv;
+}
+async function encryptData(plain,pwd){
+    const salt = crypto.getRandomValues(new Uint8Array(SALT_LEN));
+    const iv = crypto.getRandomValues(new Uint8Array(IV_LEN));
+    const key = await crypto.subtle.deriveKey(
+        {name:'PBKDF2',salt,iterations:PBKDF2_ITERATIONS,hash:'SHA-256'},
+        await crypto.subtle.importKey('raw', new TextEncoder().encode(pwd), 'PBKDF2', false, ['deriveKey']),
+        {name:'AES-GCM',length:KEY_LEN*8}, false, ['encrypt']
+    );
+    const ct = await crypto.subtle.encrypt({name:'AES-GCM',iv}, key, new TextEncoder().encode(plain));
+    const arr = new Uint8Array(ct);
+    const tag = arr.slice(-TAG_LEN), enc = arr.slice(0,-TAG_LEN);
+    const out = new Uint8Array(SALT_LEN+IV_LEN+TAG_LEN+enc.length);
+    out.set(salt,0); out.set(iv,SALT_LEN); out.set(tag,SALT_LEN+IV_LEN); out.set(enc,SALT_LEN+IV_LEN+TAG_LEN);
+    return btoa(String.fromCharCode(...out));
+}
+
+/* ---------- DECRYPT ---------- */
+async function decryptData(b64,pwd){
+    const bin = Uint8Array.from(atob(b64), c=>c.charCodeAt(0));
+    const salt = bin.slice(0,SALT_LEN), iv = bin.slice(SALT_LEN,SALT_LEN+IV_LEN);
+    const tag = bin.slice(SALT_LEN+IV_LEN,SALT_LEN+IV_LEN+TAG_LEN), ct = bin.slice(SALT_LEN+IV_LEN+TAG_LEN);
+    const key = await crypto.subtle.deriveKey(
+        {name:'PBKDF2',salt,iterations:PBKDF2_ITERATIONS,hash:'SHA-256'},
+        await crypto.subtle.importKey('raw', new TextEncoder().encode(pwd), 'PBKDF2', false, ['deriveKey']),
+        {name:'AES-GCM',length:KEY_LEN*8}, false, ['decrypt']
+    );
+    const full = new Uint8Array(ct.length + TAG_LEN); full.set(ct,0); full.set(tag,ct.length);
+    return new TextDecoder().decode(await crypto.subtle.decrypt({name:'AES-GCM',iv}, key, full));
+}
+function showDecrypted(csv){
+    csvPre.textContent = csv; decTitle.textContent = 'Decrypted'; decOut.style.display = 'block';
+    const lines = csv.trim().split('\n'); decTBody.innerHTML = '';
+    for(let i=1;i<lines.length;i++){
+        const m = lines[i].match(/"([^"]*)","([^"]*)","([^"]*)"/) || lines[i].match(/([^,]*),([^,]*),(.*)/);
+        if(!m) continue;
+        const [w, l, p] = [m[1]||m[3]||'', m[2]||'', m[3]||''];
+        if(!w && !l && !p) continue;
+        const tr = document.createElement('tr');
+        tr.innerHTML = `<td>${escHTML(w)}</td><td>${escHTML(l)}</td><td class="password-cell"><span class="password-text">••••••••</span><button class="btn btn-outline btn-small copy-btn">Copy</button></td>`;
+        const show = document.createElement('button');
+        show.className = 'btn btn-outline btn-small password-toggle'; show.textContent = 'Show'; show.dataset.pwd = escHTML(p);
+        show.onclick = () => toggleShow(show);
+        tr.cells[2].nextElementSibling.appendChild(show);
+        tr.querySelector('.copy-btn').onclick = () => copyPass(tr.querySelector('.copy-btn'), p);
+        decTBody.appendChild(tr);
+    }
+    decTable.style.display = decTBody.children.length ? 'table' : 'none';
+}
+
+/* ---------- EVENTS ---------- */
+genMasterBtn.onclick = () => { const p=genStrong(20); masterPassInp.value=p; masterPassInp.type='text'; toggleMasterBtn.textContent='Hide'; copyMasterBtn.style.display='inline-flex'; alert('Generated:\n'+p); loadTokenFromDB(); };
+genPassBtn.onclick = () => passInp.value = genStrong();
+addBtn.onclick = () => { const w=websiteInp.value.trim(), l=loginInp.value.trim(), p=passInp.value; if(!w||!l||!p) return alert('Fill all'); addRow(w,l,p); websiteInp.value=loginInp.value=passInp.value=''; };
+
+async function doEncrypt() {
+    const mp = masterPassInp.value;
+    if (!mp || !entries.length) return alert('Enter master password and add entries');
+    const enc = await encryptData(makeCSV(), mp);
+    encText.textContent = enc;
+    encOut.style.display = 'block';
+}
+
+encryptDownloadBtn.onclick = doEncrypt;
+encryptGithubBtn.onclick = async () => {
+    await doEncrypt();
+    if (!encText.textContent) return;
+    let token = githubTokenInp.value.trim();
+    const user = githubUserInp.value.trim();
+    const repo = githubRepoInp.value.trim();
+    const path = githubPathInp.value.trim();
+
+    if (!token && savedTokenEncrypted) {
+        try { token = await loadTokenDecrypted(savedTokenEncrypted, masterPassInp.value); githubTokenInp.value = token; }
+        catch { return alert('Failed to decrypt saved token'); }
+    }
+    if (!token || !user || !repo || !path) return alert('Fill all GitHub fields!');
+    await uploadToGitHubAsCSV(encText.textContent, user, repo, path, token);
+};
+
+clearAllBtn.onclick = () => { if(confirm('Clear all?')) { tableBody.innerHTML=''; entries=[]; encOut.style.display='none'; }};
+
+decryptBtn.onclick = async () => {
+    const mp = masterPassInp.value.trim(), d = encInput.value.trim();
+    if (!mp || !d) return alert('Enter master password and paste data');
+    decOut.style.display = 'block'; decTitle.textContent = 'Decrypting...';
+    try { showDecrypted(await decryptData(d, mp)); }
+    catch (e) { decTitle.textContent = 'Failed'; csvPre.textContent = e.message; }
+};
+clearDecBtn.onclick = () => { if(confirm('Clear?')) { encInput.value=''; decOut.style.display='none'; decTable.style.display='none'; }};
+dlCsvBtn.onclick = () => { const a=document.createElement('a'); a.href=URL.createObjectURL(new Blob([csvPre.textContent],{type:'text/csv'})); a.download='decrypted.csv'; a.click(); };
+
+copyEncBtn.onclick = () => copy(encText.textContent).then(() => { copyEncBtn.textContent='Copied!'; setTimeout(() => copyEncBtn.textContent='Copy',1500); });
+dlEncBtn.onclick = () => { const a=document.createElement('a'); a.href=URL.createObjectURL(new Blob([encText.textContent],{type:'text/plain'})); a.download='vault.txt'; a.click(); };
+
+toggleGithubBtn.onclick = () => githubSection.style.display = githubSection.style.display === 'none' ? 'block' : 'none';
+saveTokenBtn.onclick = saveTokenToDB;
+clearTokenBtn.onclick = clearSavedToken;
+uploadGithubBtn.onclick = () => encryptGithubBtn.click();
+
+/* TABS */
+tabEncrypt.onclick = () => { encryptMode.classList.remove('hidden'); decryptMode.classList.add('hidden'); tabEncrypt.classList.replace('btn-outline','btn-primary'); tabDecrypt.classList.replace('btn-primary','btn-outline'); };
+tabDecrypt.onclick = () => { decryptMode.classList.remove('hidden'); encryptMode.classList.add('hidden'); tabDecrypt.classList.replace('btn-outline','btn-primary'); tabEncrypt.classList.replace('btn-primary','btn-outline'); };
+
+/* ENTER */
+[websiteInp,loginInp,passInp].forEach(i=>i.addEventListener('keydown',e=>e.key==='Enter'&&addBtn.click()));
+
+/* AUTO LOAD & UPDATE PATH */
+masterPassInp.addEventListener('input', () => { if (masterPassInp.value.length > 0) loadTokenFromDB(); });
+[githubUserInp, githubRepoInp, githubPathInp].forEach(el => el.addEventListener('input', updatePreviewPath));
+updatePreviewPath();
+
+/* INIT */
+openDB().catch(console.error);
 </script>
 </body>
 </html>
