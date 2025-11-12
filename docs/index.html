@@ -156,19 +156,20 @@
         border-bottom: 1px solid var(--border);
         vertical-align: middle;
     }
-    .password-cell {
+    .password-cell, .decrypt-password-cell {
         font-family: 'Courier New', monospace;
         position: relative;
     }
-    .password-text {
+    .password-text, .decrypt-password-text {
         letter-spacing: 1px;
     }
-    .copy-btn, .password-toggle {
+    .copy-btn, .password-toggle,
+    .decrypt-copy-btn, .decrypt-password-toggle {
         font-size: 0.8rem;
         padding: 4px 8px;
         margin-left: 6px;
     }
-    .copy-btn {
+    .copy-btn, .decrypt-copy-btn {
         background: #e9ecef;
         display: none;
     }
@@ -208,9 +209,22 @@
         font-size: 0.85rem;
         color: #666;
     }
+    .file-list {
+        margin-top: 16px;
+    }
+    .decrypt-file-btn {
+        background: var(--primary);
+        color: white;
+        font-size: 0.8rem;
+        padding: 6px 10px;
+    }
+    .decrypt-file-btn:hover {
+        background: #0b5ed7;
+    }
     @media (max-width: 768px) {
         .grid-3 { grid-template-columns: 1fr; }
         .flex-between { flex-direction: column; align-items: stretch; }
+        .subtitle { font-size: 0.9rem; }
     }
 </style>
 </head>
@@ -221,8 +235,8 @@
     <div class="card text-center">
         <h1>Secure Password Vault</h1>
         <p class="subtitle">
-            GitHub is the world's largest source code host, with over 420 million repositories as of January 2023, including at least 28 million public repositories.<br>
-            The platform is used by a vast number of companies, with 90% of Fortune 100 companies utilizing it.
+            GitHub is used by over 100 million developers globally, a milestone achieved two years ahead of the company's original 2025 target.<br>
+            The platform hosts more than 330 million repositories and is utilized by 90% of Fortune 100 companies.
         </p>
     </div>
 
@@ -320,29 +334,66 @@
     <!-- 5. DECRYPT MODE -->
     <div id="decryptMode" class="hidden">
         <div class="card">
-            <h3>Paste Encrypted Data</h3>
-            <div class="form-group">
-                <textarea id="encryptedInput" placeholder="Paste your encrypted Base64 string here..."></textarea>
+            <h3>Decrypt from GitHub</h3>
+            <div class="grid-3">
+                <div class="form-group">
+                    <label for="githubUser">GitHub User / Org</label>
+                    <input type="text" id="githubUser" placeholder="your-username">
+                </div>
+                <div class="form-group">
+                    <label for="githubRepo">Repository</label>
+                    <input type="text" id="githubRepo" placeholder="my-vault">
+                </div>
+                <div class="form-group">
+                    <label for="githubDir">Directory Path</label>
+                    <input type="text" id="githubDir" value="uploads/credentials" placeholder="folder/to/list">
+                </div>
             </div>
             <div class="flex-center">
-                <button id="decryptBtn" class="btn btn-success">Decrypt & View</button>
-                <button id="clearDecrypt" class="btn btn-outline">Clear</button>
+                <button id="loadFilesBtn" class="btn btn-primary">Load Files from GitHub</button>
             </div>
 
+            <!-- File List Table -->
+            <div id="fileListSection" class="file-list hidden">
+                <table id="fileListTable">
+                    <thead>
+                        <tr>
+                            <th>File</th>
+                            <th>Size</th>
+                            <th>Action</th>
+                        </tr>
+                    </thead>
+                    <tbody></tbody>
+                </table>
+            </div>
+
+            <!-- Manual Paste Fallback -->
+            <div class="mt-1">
+                <h4 style="margin:16px 0 8px;">Or Paste Encrypted Data</h4>
+                <textarea id="encryptedInput" placeholder="Paste your encrypted Base64 string here..."></textarea>
+                <div class="flex-center mt-1">
+                    <button id="decryptBtn" class="btn btn-success">Decrypt & View</button>
+                    <button id="clearDecrypt" class="btn btn-outline">Clear</button>
+                </div>
+            </div>
+
+            <!-- Decrypted Output -->
             <div id="decryptOutput" class="output">
                 <strong id="decTitle">Decrypted CSV:</strong><br>
-                <pre id="csvText"></pre>
+                <pre id="csvText" style="display:none;"></pre>
                 <div class="flex-center">
                     <button id="downloadCsv" class="btn btn-outline">Download CSV</button>
                 </div>
             </div>
 
+            <!-- Decrypted Table -->
             <table id="decryptTable" style="margin-top:20px;display:none;">
                 <thead>
                     <tr>
                         <th>Website</th>
                         <th>Login</th>
                         <th>Password</th>
+                        <th style="width:140px;">Actions</th>
                     </tr>
                 </thead>
                 <tbody></tbody>
@@ -364,21 +415,8 @@
             </div>
         </div>
         <div class="form-group">
-            <label for="githubUser">GitHub User / Org</label>
-            <input type="text" id="githubUser" placeholder="your-username">
-        </div>
-        <div class="grid-3">
-            <div class="form-group">
-                <label for="githubRepo">Repository</label>
-                <input type="text" id="githubRepo" placeholder="my-vault">
-            </div>
-            <div class="form-group">
-                <label for="githubPath">File Path</label>
-                <input type="text" id="githubPath" value="uploads/credentials/vault.csv" placeholder="path/to/vault.csv">
-            </div>
-            <div class="form-group" style="align-self:end;">
-                <button id="uploadToGithub" class="btn btn-success" style="width:100%;">Upload CSV</button>
-            </div>
+            <label for="githubPath">File Path</label>
+            <input type="text" id="githubPath" value="uploads/credentials/vault.csv" placeholder="path/to/vault.csv">
         </div>
         <div class="flex-center mt-1">
             <button id="saveToken" class="btn btn-outline">Save Token Securely</button>
@@ -405,7 +443,7 @@ const TAG_LEN = 16;
 const GITHUB_BRANCH = 'main';
 const GITHUB_COMMIT_MESSAGE = 'Update encrypted vault (CSV)';
 
-/* ---------- INDEXEDDB (FIXED) ---------- */
+/* ---------- INDEXEDDB ---------- */
 let db;
 const DB_NAME = 'PasswordVaultDB';
 const DB_VERSION = 2;
@@ -435,13 +473,11 @@ const genMasterBtn    = document.getElementById('genMaster');
 const saveMasterBtn   = document.getElementById('saveMasterBtn');
 const clearMasterBtn  = document.getElementById('clearMasterBtn');
 const masterStatus    = document.getElementById('masterStatus');
+
 const tabEncrypt      = document.getElementById('tabEncrypt');
 const tabDecrypt      = document.getElementById('tabDecrypt');
 const encryptMode     = document.getElementById('encryptMode');
 const decryptMode     = document.getElementById('decryptMode');
-const encryptDownloadBtn = document.getElementById('encryptDownloadBtn');
-const encryptGithubBtn   = document.getElementById('encryptGithubBtn');
-const clearAllBtn     = document.getElementById('clearAll');
 
 const websiteInp = document.getElementById('website');
 const loginInp   = document.getElementById('login');
@@ -454,6 +490,10 @@ const encText    = document.getElementById('encryptedText');
 const copyEncBtn = document.getElementById('copyEncrypted');
 const dlEncBtn   = document.getElementById('downloadEnc');
 
+const encryptDownloadBtn = document.getElementById('encryptDownloadBtn');
+const encryptGithubBtn   = document.getElementById('encryptGithubBtn');
+const clearAllBtn     = document.getElementById('clearAll');
+
 const encInput   = document.getElementById('encryptedInput');
 const decryptBtn = document.getElementById('decryptBtn');
 const clearDecBtn= document.getElementById('clearDecrypt');
@@ -464,18 +504,23 @@ const dlCsvBtn   = document.getElementById('downloadCsv');
 const decTable   = document.getElementById('decryptTable');
 const decTBody   = decTable.querySelector('tbody');
 
+const loadFilesBtn = document.getElementById('loadFilesBtn');
+const fileListSection = document.getElementById('fileListSection');
+const fileListTable = document.getElementById('fileListTable').querySelector('tbody');
+
+const githubUserInp = document.getElementById('githubUser');
+const githubRepoInp = document.getElementById('githubRepo');
+const githubDirInp  = document.getElementById('githubDir');
+const githubTokenInp = document.getElementById('githubToken');
+const githubPathInp = document.getElementById('githubPath');
+const previewPath   = document.getElementById('previewPath');
+
 const toggleGithubBtn = document.getElementById('toggleGithub');
 const githubSection   = document.getElementById('githubSection');
-const githubTokenInp  = document.getElementById('githubToken');
 const toggleTokenBtn  = document.getElementById('toggleToken');
-const githubUserInp   = document.getElementById('githubUser');
-const githubRepoInp   = document.getElementById('githubRepo');
-const githubPathInp   = document.getElementById('githubPath');
-const uploadGithubBtn = document.getElementById('uploadToGithub');
 const saveTokenBtn    = document.getElementById('saveToken');
 const clearTokenBtn   = document.getElementById('clearToken');
 const tokenStatus     = document.getElementById('tokenStatus');
-const previewPath     = document.getElementById('previewPath');
 
 /* ---------- STATE ---------- */
 let entries = [];
@@ -505,7 +550,7 @@ function updatePreviewPath() {
     }
 }
 
-/* ---------- SECURE ENCRYPT/DECRYPT (for storage) ---------- */
+/* ---------- SECURE STORAGE ---------- */
 async function encryptData(data, password) {
     const salt = crypto.getRandomValues(new Uint8Array(16));
     const key = await crypto.subtle.deriveKey(
@@ -535,7 +580,7 @@ async function decryptData(encryptedB64, password) {
     return new TextDecoder().decode(pt);
 }
 
-/* ---------- MASTER SAVE/LOAD (FIXED) ---------- */
+/* ---------- MASTER & TOKEN ---------- */
 async function saveMasterSecurely() {
     const master = masterPassInp.value;
     const key = saveKeyInp.value;
@@ -549,10 +594,7 @@ async function saveMasterSecurely() {
         savedMasterEncrypted = encrypted;
         masterStatus.textContent = 'Master password saved securely!';
         masterStatus.className = 'master-status master-saved';
-    } catch (e) { 
-        console.error(e);
-        alert('Save failed: ' + e.message); 
-    }
+    } catch (e) { alert('Save failed: ' + e.message); }
 }
 async function loadMasterSecurely() {
     const key = saveKeyInp.value;
@@ -595,7 +637,6 @@ saveMasterBtn.onclick = saveMasterSecurely;
 clearMasterBtn.onclick = clearSavedMaster;
 saveKeyInp.addEventListener('input', loadMasterSecurely);
 
-/* ---------- TOKEN SAVE/LOAD (FIXED) ---------- */
 async function saveTokenToDB() {
     const token = githubTokenInp.value.trim();
     const master = masterPassInp.value;
@@ -650,41 +691,86 @@ async function clearSavedToken() {
 saveTokenBtn.onclick = saveTokenToDB;
 clearTokenBtn.onclick = clearSavedToken;
 
-/* ---------- GITHUB UPLOAD ---------- */
-async function uploadToGitHubAsCSV(encryptedBase64, user, repo, path, token) {
-    const url = `https://api.github.com/repos/${user}/${repo}/contents/${path}`;
-    const headers = {
-        'Authorization': `Bearer ${token}`,
-        'Accept': 'application/vnd.github+json',
-        'X-GitHub-Api-Version': '2022-11-28'
-    };
-    const csvContent = `"${encryptedBase64}"`;
-    const base64Content = btoa(unescape(encodeURIComponent(csvContent)));
+/* ---------- GITHUB API ---------- */
+async function getToken() {
+    let token = githubTokenInp.value.trim();
+    if (!token && savedTokenEncrypted) {
+        try { token = await decryptData(savedTokenEncrypted, masterPassInp.value); }
+        catch { alert('Failed to decrypt saved token'); return null; }
+    }
+    return token;
+}
+
+async function listFilesInDirectory(user, repo, path, token) {
+    const url = `https://api.github.com/repos/${user}/${repo}/contents/${path}?ref=${GITHUB_BRANCH}`;
+    const res = await fetch(url, {
+        headers: { 'Authorization': `Bearer ${token}`, 'Accept': 'application/vnd.github+json' }
+    });
+    if (!res.ok) throw new Error(`GitHub error: ${res.status}`);
+    const files = await res.json();
+    return files.filter(f => f.name.endsWith('.csv') && f.type === 'file');
+}
+
+async function downloadFile(user, repo, path, token) {
+    const url = `https://api.github.com/repos/${user}/${repo}/contents/${path}?ref=${GITHUB_BRANCH}`;
+    const res = await fetch(url, {
+        headers: { 'Authorization': `Bearer ${token}`, 'Accept': 'application/vnd.github+json' }
+    });
+    if (!res.ok) throw new Error(`Download failed: ${res.status}`);
+    const data = await res.json();
+    const content = atob(data.content.replace(/\s/g, ''));
+    return content.match(/"([^"]+)"/)[1]; // Extract Base64 from `"base64string"`
+}
+
+/* ---------- DECRYPT FROM GITHUB ---------- */
+loadFilesBtn.onclick = async () => {
+    const user = githubUserInp.value.trim();
+    const repo = githubRepoInp.value.trim();
+    const dir = githubDirInp.value.trim();
+    const token = await getToken();
+    if (!user || !repo || !dir || !token) return alert('Fill all GitHub fields and token');
+
+    fileListTable.innerHTML = '<tr><td colspan="3">Loading...</td></tr>';
+    fileListSection.classList.remove('hidden');
 
     try {
-        const getRes = await fetch(url, { headers });
-        let body;
-        if (getRes.status === 404) {
-            body = { message: GITHUB_COMMIT_MESSAGE, content: base64Content, branch: GITHUB_BRANCH };
-        } else if (getRes.ok) {
-            const data = await getRes.json();
-            body = { message: GITHUB_COMMIT_MESSAGE, content: base64Content, sha: data.sha, branch: GITHUB_BRANCH };
-        } else {
-            throw new Error(`GitHub API error: ${getRes.status}`);
+        const files = await listFilesInDirectory(user, repo, dir, token);
+        fileListTable.innerHTML = '';
+        if (files.length === 0) {
+            fileListTable.innerHTML = '<tr><td colspan="3">No CSV files found.</td></tr>';
+            return;
         }
-        const putRes = await fetch(url, { method: 'PUT', headers, body: JSON.stringify(body) });
-        if (putRes.ok) {
-            alert(`Uploaded to GitHub!\n${user}/${repo}/blob/${GITHUB_BRANCH}/${path}`);
-        } else {
-            const err = await putRes.text();
-            throw new Error(err);
-        }
+        files.forEach(file => {
+            const tr = document.createElement('tr');
+            tr.innerHTML = `
+                <td>${escHTML(file.name)}</td>
+                <td>${file.size} bytes</td>
+                <td><button class="btn decrypt-file-btn" data-path="${file.path}">Decrypt</button></td>
+            `;
+            tr.querySelector('.decrypt-file-btn').onclick = () => decryptGitHubFile(file.path, user, repo, token);
+            fileListTable.appendChild(tr);
+        });
     } catch (e) {
-        alert(`Upload failed: ${e.message}`);
+        fileListTable.innerHTML = `<tr><td colspan="3">Error: ${e.message}</td></tr>`;
+    }
+};
+
+async function decryptGitHubFile(path, user, repo, token) {
+    const mp = masterPassInp.value;
+    if (!mp) return alert('Enter master password');
+    decTitle.textContent = 'Decrypting...';
+    decOut.style.display = 'block';
+    try {
+        const base64 = await downloadFile(user, repo, path, token);
+        const csv = await decryptDataVault(base64, mp);
+        showDecrypted(csv);
+    } catch (e) {
+        decTitle.textContent = 'Failed';
+        csvPre.textContent = e.message;
     }
 }
 
-/* ---------- VAULT ENCRYPT/DECRYPT ---------- */
+/* ---------- ENCRYPT/DECRYPT VAULT ---------- */
 function addRow(w,l,p){
     const tr = document.createElement('tr');
     tr.innerHTML = `
@@ -740,6 +826,65 @@ async function decryptDataVault(b64,pwd){
     return new TextDecoder().decode(await crypto.subtle.decrypt({name:'AES-GCM',iv}, key, full));
 }
 
+function showDecrypted(csv) {
+    decTitle.textContent = 'Decrypted CSV:';
+    csvPre.textContent = csv;
+    const lines = csv.trim().split('\n');
+    if (lines.length < 2) {
+        decTable.style.display = 'none';
+        csvPre.style.display = 'block';
+        return;
+    }
+
+    const tbody = decTable.querySelector('tbody');
+    tbody.innerHTML = '';
+    for (let i = 1; i < lines.length; i++) {
+        const cols = lines[i].split(',').map(s => s.replace(/^"|"$/g, '').replace(/""/g, '"'));
+        if (cols.length < 3) continue;
+        const [w, l, p] = cols;
+
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+            <td>${escHTML(w)}</td>
+            <td>${escHTML(l)}</td>
+            <td class="decrypt-password-cell">
+                <span class="decrypt-password-text">••••••••</span>
+                <button class="btn btn-outline btn-small decrypt-copy-btn">Copy</button>
+            </td>
+            <td>
+                <button class="btn btn-outline btn-small decrypt-password-toggle" data-pwd="${escHTML(p)}">Show</button>
+            </td>
+        `;
+
+        const toggleBtn = tr.querySelector('.decrypt-password-toggle');
+        const copyBtn = tr.querySelector('.decrypt-copy-btn');
+        const textSpan = tr.querySelector('.decrypt-password-text');
+
+        toggleBtn.onclick = () => {
+            if (toggleBtn.textContent === 'Show') {
+                textSpan.textContent = p;
+                toggleBtn.textContent = 'Hide';
+                copyBtn.style.display = 'inline-flex';
+            } else {
+                textSpan.textContent = '••••••••';
+                toggleBtn.textContent = 'Show';
+                copyBtn.style.display = 'none';
+            }
+        };
+
+        copyBtn.onclick = async () => {
+            if (await copy(p)) {
+                copyBtn.textContent = 'Copied!';
+                setTimeout(() => copyBtn.textContent = 'Copy', 1500);
+            }
+        };
+
+        tbody.appendChild(tr);
+    }
+    decTable.style.display = 'table';
+    csvPre.style.display = 'none';
+}
+
 /* ---------- EVENTS ---------- */
 genMasterBtn.onclick = () => { const p=genStrong(20); masterPassInp.value=p; masterPassInp.type='text'; toggleMasterBtn.textContent='Hide'; copyMasterBtn.style.display='inline-flex'; alert('Generated:\n'+p); };
 genPassBtn.onclick = () => passInp.value = genStrong();
@@ -757,21 +902,36 @@ encryptDownloadBtn.onclick = doEncrypt;
 encryptGithubBtn.onclick = async () => {
     await doEncrypt();
     if (!encText.textContent) return;
-    let token = githubTokenInp.value.trim();
+    const token = await getToken();
     const user = githubUserInp.value.trim();
     const repo = githubRepoInp.value.trim();
     const path = githubPathInp.value.trim();
-
-    if (!token && savedTokenEncrypted) {
-        try { token = await decryptData(savedTokenEncrypted, masterPassInp.value); githubTokenInp.value = token; }
-        catch { return alert('Failed to decrypt saved token'); }
-    }
     if (!token || !user || !repo || !path) return alert('Fill all GitHub fields!');
     await uploadToGitHubAsCSV(encText.textContent, user, repo, path, token);
 };
 
-clearAllBtn.onclick = () => { if(confirm('Clear all?')) { tableBody.innerHTML=''; entries=[]; encOut.style.display='none'; }};
+async function uploadToGitHubAsCSV(encryptedBase64, user, repo, path, token) {
+    const url = `https://api.github.com/repos/${user}/${repo}/contents/${path}`;
+    const headers = { 'Authorization': `Bearer ${token}`, 'Accept': 'application/vnd.github+json', 'X-GitHub-Api-Version': '2022-11-28' };
+    const csvContent = `"${encryptedBase64}"`;
+    const base64Content = btoa(unescape(encodeURIComponent(csvContent)));
 
+    try {
+        const getRes = await fetch(url, { headers });
+        let body;
+        if (getRes.status === 404) {
+            body = { message: GITHUB_COMMIT_MESSAGE, content: base64Content, branch: GITHUB_BRANCH };
+        } else if (getRes.ok) {
+            const data = await getRes.json();
+            body = { message: GITHUB_COMMIT_MESSAGE, content: base64Content, sha: data.sha, branch: GITHUB_BRANCH };
+        } else throw new Error(`GitHub API error: ${getRes.status}`);
+        const putRes = await fetch(url, { method: 'PUT', headers, body: JSON.stringify(body) });
+        if (putRes.ok) alert(`Uploaded to GitHub!\n${user}/${repo}/blob/${GITHUB_BRANCH}/${path}`);
+        else throw new Error(await putRes.text());
+    } catch (e) { alert(`Upload failed: ${e.message}`); }
+}
+
+clearAllBtn.onclick = () => { if(confirm('Clear all?')) { tableBody.innerHTML=''; entries=[]; encOut.style.display='none'; }};
 decryptBtn.onclick = async () => {
     const mp = masterPassInp.value.trim(), d = encInput.value.trim();
     if (!mp || !d) return alert('Enter master password and paste data');
@@ -779,23 +939,20 @@ decryptBtn.onclick = async () => {
     try { showDecrypted(await decryptDataVault(d, mp)); }
     catch (e) { decTitle.textContent = 'Failed'; csvPre.textContent = e.message; }
 };
-clearDecBtn.onclick = () => { if(confirm('Clear?')) { encInput.value=''; decOut.style.display='none'; decTable.style.display='none'; }};
+clearDecBtn.onclick = () => { if(confirm('Clear?')) { encInput.value=''; decOut.style.display='none'; decTable.style.display='none'; fileListSection.classList.add('hidden'); }};
 dlCsvBtn.onclick = () => { const a=document.createElement('a'); a.href=URL.createObjectURL(new Blob([csvPre.textContent],{type:'text/csv'})); a.download='decrypted.csv'; a.click(); };
 
 copyEncBtn.onclick = () => copy(encText.textContent).then(() => { copyEncBtn.textContent='Copied!'; setTimeout(() => copyEncBtn.textContent='Copy',1500); });
 dlEncBtn.onclick = () => { const a=document.createElement('a'); a.href=URL.createObjectURL(new Blob([encText.textContent],{type:'text/plain'})); a.download='vault.txt'; a.click(); };
 
 toggleGithubBtn.onclick = () => githubSection.style.display = githubSection.style.display === 'none' ? 'block' : 'none';
-uploadGithubBtn.onclick = () => encryptGithubBtn.click();
 
 /* TABS */
 tabEncrypt.onclick = () => { encryptMode.classList.remove('hidden'); decryptMode.classList.add('hidden'); tabEncrypt.classList.replace('btn-outline','btn-primary'); tabDecrypt.classList.replace('btn-primary','btn-outline'); };
 tabDecrypt.onclick = () => { decryptMode.classList.remove('hidden'); encryptMode.classList.add('hidden'); tabDecrypt.classList.replace('btn-outline','btn-primary'); tabEncrypt.classList.replace('btn-primary','btn-outline'); };
 
-/* ENTER */
+/* ENTER & AUTO */
 [websiteInp,loginInp,passInp].forEach(i=>i.addEventListener('keydown',e=>e.key==='Enter'&&addBtn.click()));
-
-/* AUTO LOAD & PATH */
 masterPassInp.addEventListener('input', () => { if (masterPassInp.value.length > 0) loadTokenFromDB(); });
 [githubUserInp, githubRepoInp, githubPathInp].forEach(el => el.addEventListener('input', updatePreviewPath));
 updatePreviewPath();
