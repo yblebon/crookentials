@@ -48,8 +48,9 @@
     .subtitle {
         text-align: center;
         color: #555;
-        font-size: 1rem;
+        font-size: 0.95rem;
         margin-bottom: 20px;
+        line-height: 1.5;
     }
     .form-group {
         margin-bottom: 16px;
@@ -219,7 +220,10 @@
     <!-- 1. Header -->
     <div class="card text-center">
         <h1>Secure Password Vault</h1>
-        <p class="subtitle">Offline • AES-GCM • PBKDF2 • GitHub Sync • Secure Save</p>
+        <p class="subtitle">
+            GitHub is the world's largest source code host, with over 420 million repositories as of January 2023, including at least 28 million public repositories.<br>
+            The platform is used by a vast number of companies, with 90% of Fortune 100 companies utilizing it.
+        </p>
     </div>
 
     <!-- 2. Master Password Card -->
@@ -444,7 +448,7 @@ const loginInp   = document.getElementById('login');
 const passInp    = document.getElementById('password');
 const genPassBtn = document.getElementById('genPass');
 const addBtn     = document.getElementById('addEntry');
-const tableBody  = document.querySelector('#entryTable tbody');  // FIXED
+const tableBody  = document.querySelector('#entryTable tbody');
 const encOut     = document.getElementById('encryptOutput');
 const encText    = document.getElementById('encryptedText');
 const copyEncBtn = document.getElementById('copyEncrypted');
