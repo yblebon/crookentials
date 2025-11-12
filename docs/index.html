@@ -189,13 +189,13 @@
     .github-card {
         border-left: 4px solid var(--primary);
     }
-    .token-status {
+    .token-status, .master-status {
         font-size: 0.85rem;
         margin-top: 8px;
         color: #555;
     }
-    .token-saved { color: var(--success); }
-    .token-notsaved { color: var(--warning); }
+    .token-saved, .master-saved { color: var(--success); }
+    .token-notsaved, .master-notsaved { color: var(--warning); }
     .action-bar {
         display: flex;
         justify-content: center;
@@ -219,10 +219,10 @@
     <!-- 1. Header -->
     <div class="card text-center">
         <h1>Secure Password Vault</h1>
-        <p class="subtitle">Offline • AES-GCM • PBKDF2 • GitHub Sync</p>
+        <p class="subtitle">Offline • AES-GCM • PBKDF2 • GitHub Sync • Secure Save</p>
     </div>
 
-    <!-- 2. Master Password -->
+    <!-- 2. Master Password Card -->
     <div class="card">
         <div class="form-group">
             <label for="masterPassword">Master Password</label>
@@ -231,9 +231,18 @@
                 <button id="toggleMaster" class="btn btn-outline btn-small">Show</button>
                 <button id="copyMaster" class="btn btn-secondary btn-small copy-btn">Copy</button>
             </div>
-            <div class="flex-center mt-1">
-                <button id="genMaster" class="btn btn-outline">Generate Strong Master</button>
+            <div id="masterStatus" class="master-status master-notsaved">
+                Master password not saved.
             </div>
+        </div>
+        <div class="form-group">
+            <label for="saveKey">Save Key (to unlock saved password)</label>
+            <input type="password" id="saveKey" placeholder="Enter a strong save key">
+        </div>
+        <div class="flex-center">
+            <button id="genMaster" class="btn btn-outline">Generate Strong Master</button>
+            <button id="saveMasterBtn" class="btn btn-success">Save Master Securely</button>
+            <button id="clearMasterBtn" class="btn btn-outline">Clear Saved</button>
         </div>
     </div>
 
@@ -337,7 +346,7 @@
         </div>
     </div>
 
-    <!-- 6. GitHub Sync (Editable!) -->
+    <!-- 6. GitHub Sync -->
     <div class="card github-card" id="githubSection" style="display:none;">
         <h3 style="margin-bottom:16px;">GitHub Upload</h3>
         <div class="form-group">
@@ -392,11 +401,11 @@ const TAG_LEN = 16;
 const GITHUB_BRANCH = 'main';
 const GITHUB_COMMIT_MESSAGE = 'Update encrypted vault (CSV)';
 
-/* ---------- INDEXEDDB ---------- */
+/* ---------- INDEXEDDB (FIXED) ---------- */
 let db;
 const DB_NAME = 'PasswordVaultDB';
-const DB_VERSION = 1;
-const STORE_NAME = 'githubTokens';
+const DB_VERSION = 2;
+const STORE_NAME = 'vaultSecrets';
 
 function openDB() {
     return new Promise((resolve, reject) => {
@@ -411,43 +420,17 @@ function openDB() {
         req.onerror = e => reject(e.target.error);
     });
 }
-
-async function saveTokenEncrypted(token, masterPass) {
-    const salt = crypto.getRandomValues(new Uint8Array(16));
-    const key = await crypto.subtle.deriveKey(
-        { name: 'PBKDF2', salt, iterations: 100000, hash: 'SHA-256' },
-        await crypto.subtle.importKey('raw', new TextEncoder().encode(masterPass), 'PBKDF2', false, ['deriveKey']),
-        { name: 'AES-GCM', length: 256 }, false, ['encrypt']
-    );
-    const iv = crypto.getRandomValues(new Uint8Array(12));
-    const data = new TextEncoder().encode(token);
-    const ct = await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, key, data);
-    const encrypted = new Uint8Array(salt.byteLength + iv.byteLength + ct.byteLength);
-    encrypted.set(salt, 0);
-    encrypted.set(iv, salt.byteLength);
-    encrypted.set(new Uint8Array(ct), salt.byteLength + iv.byteLength);
-    return btoa(String.fromCharCode(...encrypted));
-}
-
-async function loadTokenDecrypted(encryptedB64, masterPass) {
-    const bin = Uint8Array.from(atob(encryptedB64), c => c.charCodeAt(0));
-    const salt = bin.slice(0, 16);
-    const iv = bin.slice(16, 28);
-    const ct = bin.slice(28);
-    const key = await crypto.subtle.deriveKey(
-        { name: 'PBKDF2', salt, iterations: 100000, hash: 'SHA-256' },
-        await crypto.subtle.importKey('raw', new TextEncoder().encode(masterPass), 'PBKDF2', false, ['deriveKey']),
-        { name: 'AES-GCM', length: 256 }, false, ['decrypt']
-    );
-    const pt = await crypto.subtle.decrypt({ name: 'AES-GCM', iv }, key, ct);
-    return new TextDecoder().decode(pt);
-}
+let dbReady = openDB();
 
 /* ---------- DOM ---------- */
 const masterPassInp   = document.getElementById('masterPassword');
+const saveKeyInp      = document.getElementById('saveKey');
 const toggleMasterBtn = document.getElementById('toggleMaster');
 const copyMasterBtn   = document.getElementById('copyMaster');
 const genMasterBtn    = document.getElementById('genMaster');
+const saveMasterBtn   = document.getElementById('saveMasterBtn');
+const clearMasterBtn  = document.getElementById('clearMasterBtn');
+const masterStatus    = document.getElementById('masterStatus');
 const tabEncrypt      = document.getElementById('tabEncrypt');
 const tabDecrypt      = document.getElementById('tabDecrypt');
 const encryptMode     = document.getElementById('encryptMode');
@@ -456,19 +439,17 @@ const encryptDownloadBtn = document.getElementById('encryptDownloadBtn');
 const encryptGithubBtn   = document.getElementById('encryptGithubBtn');
 const clearAllBtn     = document.getElementById('clearAll');
 
-/* ENCRYPT */
 const websiteInp = document.getElementById('website');
 const loginInp   = document.getElementById('login');
 const passInp    = document.getElementById('password');
 const genPassBtn = document.getElementById('genPass');
 const addBtn     = document.getElementById('addEntry');
-const tableBody  = document.querySelector('#entryTable tbody');
+const tableBody  = document.querySelector('#entryTable tbody');  // FIXED
 const encOut     = document.getElementById('encryptOutput');
 const encText    = document.getElementById('encryptedText');
 const copyEncBtn = document.getElementById('copyEncrypted');
 const dlEncBtn   = document.getElementById('downloadEnc');
 
-/* DECRYPT */
 const encInput   = document.getElementById('encryptedInput');
 const decryptBtn = document.getElementById('decryptBtn');
 const clearDecBtn= document.getElementById('clearDecrypt');
@@ -479,7 +460,6 @@ const dlCsvBtn   = document.getElementById('downloadCsv');
 const decTable   = document.getElementById('decryptTable');
 const decTBody   = decTable.querySelector('tbody');
 
-/* GITHUB */
 const toggleGithubBtn = document.getElementById('toggleGithub');
 const githubSection   = document.getElementById('githubSection');
 const githubTokenInp  = document.getElementById('githubToken');
@@ -495,6 +475,7 @@ const previewPath     = document.getElementById('previewPath');
 
 /* ---------- STATE ---------- */
 let entries = [];
+let savedMasterEncrypted = null;
 let savedTokenEncrypted = null;
 
 /* ---------- UTILS ---------- */
@@ -520,64 +501,125 @@ function updatePreviewPath() {
     }
 }
 
-/* ---------- MASTER PASSWORD ---------- */
-toggleMasterBtn.onclick = () => {
-    if (masterPassInp.type === 'password') {
-        masterPassInp.type = 'text';
-        toggleMasterBtn.textContent = 'Hide';
-        copyMasterBtn.style.display = 'inline-flex';
-    } else {
-        masterPassInp.type = 'password';
-        toggleMasterBtn.textContent = 'Show';
-        copyMasterBtn.style.display = 'none';
-        copyMasterBtn.innerHTML = 'Copy';
-    }
-};
-copyMasterBtn.onclick = async () => {
-    const pwd = masterPassInp.value;
-    if (!pwd) return alert("No password");
-    if (await copy(pwd)) {
-        const orig = copyMasterBtn.innerHTML;
-        copyMasterBtn.innerHTML = 'Copied!';
-        setTimeout(() => copyMasterBtn.innerHTML = orig, 1500);
-    }
-};
+/* ---------- SECURE ENCRYPT/DECRYPT (for storage) ---------- */
+async function encryptData(data, password) {
+    const salt = crypto.getRandomValues(new Uint8Array(16));
+    const key = await crypto.subtle.deriveKey(
+        { name: 'PBKDF2', salt, iterations: 100000, hash: 'SHA-256' },
+        await crypto.subtle.importKey('raw', new TextEncoder().encode(password), 'PBKDF2', false, ['deriveKey']),
+        { name: 'AES-GCM', length: 256 }, false, ['encrypt']
+    );
+    const iv = crypto.getRandomValues(new Uint8Array(12));
+    const ct = await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, key, new TextEncoder().encode(data));
+    const encrypted = new Uint8Array(salt.byteLength + iv.byteLength + ct.byteLength);
+    encrypted.set(salt, 0);
+    encrypted.set(iv, salt.byteLength);
+    encrypted.set(new Uint8Array(ct), salt.byteLength + iv.byteLength);
+    return btoa(String.fromCharCode(...encrypted));
+}
+async function decryptData(encryptedB64, password) {
+    const bin = Uint8Array.from(atob(encryptedB64), c => c.charCodeAt(0));
+    const salt = bin.slice(0, 16);
+    const iv = bin.slice(16, 28);
+    const ct = bin.slice(28);
+    const key = await crypto.subtle.deriveKey(
+        { name: 'PBKDF2', salt, iterations: 100000, hash: 'SHA-256' },
+        await crypto.subtle.importKey('raw', new TextEncoder().encode(password), 'PBKDF2', false, ['deriveKey']),
+        { name: 'AES-GCM', length: 256 }, false, ['decrypt']
+    );
+    const pt = await crypto.subtle.decrypt({ name: 'AES-GCM', iv }, key, ct);
+    return new TextDecoder().decode(pt);
+}
 
-/* ---------- TOKEN ---------- */
-toggleTokenBtn.onclick = () => {
-    githubTokenInp.type = githubTokenInp.type === 'password' ? 'text' : 'password';
-    toggleTokenBtn.textContent = githubTokenInp.type === 'text' ? 'Hide' : 'Show';
-};
+/* ---------- MASTER SAVE/LOAD (FIXED) ---------- */
+async function saveMasterSecurely() {
+    const master = masterPassInp.value;
+    const key = saveKeyInp.value;
+    if (!master || !key) return alert('Enter both master password and save key');
+    try {
+        const encrypted = await encryptData(master, key);
+        const db = await dbReady;
+        const tx = db.transaction(STORE_NAME, 'readwrite');
+        tx.objectStore(STORE_NAME).put({ id: 'master', data: encrypted });
+        await tx.done;
+        savedMasterEncrypted = encrypted;
+        masterStatus.textContent = 'Master password saved securely!';
+        masterStatus.className = 'master-status master-saved';
+    } catch (e) { 
+        console.error(e);
+        alert('Save failed: ' + e.message); 
+    }
+}
+async function loadMasterSecurely() {
+    const key = saveKeyInp.value;
+    if (!key) return;
+    try {
+        const db = await dbReady;
+        const tx = db.transaction(STORE_NAME, 'readonly');
+        const req = tx.objectStore(STORE_NAME).get('master');
+        req.onsuccess = async () => {
+            if (req.result) {
+                try {
+                    const decrypted = await decryptData(req.result.data, key);
+                    masterPassInp.value = decrypted;
+                    savedMasterEncrypted = req.result.data;
+                    masterStatus.textContent = 'Master password loaded';
+                    masterStatus.className = 'master-status master-saved';
+                    loadTokenFromDB();
+                } catch (e) {
+                    masterStatus.textContent = 'Wrong save key';
+                    masterStatus.className = 'master-status master-notsaved';
+                }
+            }
+        };
+    } catch (e) { console.error(e); }
+}
+async function clearSavedMaster() {
+    if (!confirm('Delete saved master password?')) return;
+    try {
+        const db = await dbReady;
+        const tx = db.transaction(STORE_NAME, 'readwrite');
+        tx.objectStore(STORE_NAME).delete('master');
+        await tx.done;
+        savedMasterEncrypted = null;
+        masterPassInp.value = '';
+        masterStatus.textContent = 'Saved master cleared';
+        masterStatus.className = 'master-status master-notsaved';
+    } catch (e) { alert('Clear failed'); }
+}
+saveMasterBtn.onclick = saveMasterSecurely;
+clearMasterBtn.onclick = clearSavedMaster;
+saveKeyInp.addEventListener('input', loadMasterSecurely);
 
+/* ---------- TOKEN SAVE/LOAD (FIXED) ---------- */
 async function saveTokenToDB() {
     const token = githubTokenInp.value.trim();
     const master = masterPassInp.value;
     if (!token || !master) return alert('Enter token and master password');
     try {
-        const encrypted = await saveTokenEncrypted(token, master);
-        await openDB();
+        const encrypted = await encryptData(token, master);
+        const db = await dbReady;
         const tx = db.transaction(STORE_NAME, 'readwrite');
-        tx.objectStore(STORE_NAME).put({ id: 'github', token: encrypted });
+        tx.objectStore(STORE_NAME).put({ id: 'github', data: encrypted });
         await tx.done;
         savedTokenEncrypted = encrypted;
         tokenStatus.textContent = 'Token saved securely!';
         tokenStatus.className = 'token-status token-saved';
     } catch (e) { alert('Save failed: ' + e.message); }
 }
-
 async function loadTokenFromDB() {
     const master = masterPassInp.value;
     if (!master) return;
     try {
-        await openDB();
+        const db = await dbReady;
         const tx = db.transaction(STORE_NAME, 'readonly');
         const req = tx.objectStore(STORE_NAME).get('github');
         req.onsuccess = async () => {
             if (req.result) {
                 try {
-                    const decrypted = await loadTokenDecrypted(req.result.token, master);
+                    const decrypted = await decryptData(req.result.data, master);
                     githubTokenInp.value = decrypted;
-                    savedTokenEncrypted = req.result.token;
+                    savedTokenEncrypted = req.result.data;
                     tokenStatus.textContent = 'Token loaded';
                     tokenStatus.className = 'token-status token-saved';
                 } catch (e) {
@@ -588,11 +630,10 @@ async function loadTokenFromDB() {
         };
     } catch (e) { console.error(e); }
 }
-
 async function clearSavedToken() {
     if (!confirm('Delete saved token?')) return;
     try {
-        await openDB();
+        const db = await dbReady;
         const tx = db.transaction(STORE_NAME, 'readwrite');
         tx.objectStore(STORE_NAME).delete('github');
         await tx.done;
@@ -602,8 +643,10 @@ async function clearSavedToken() {
         tokenStatus.className = 'token-status token-notsaved';
     } catch (e) { alert('Clear failed'); }
 }
+saveTokenBtn.onclick = saveTokenToDB;
+clearTokenBtn.onclick = clearSavedToken;
 
-/* ---------- GITHUB UPLOAD (FIXED!) ---------- */
+/* ---------- GITHUB UPLOAD ---------- */
 async function uploadToGitHubAsCSV(encryptedBase64, user, repo, path, token) {
     const url = `https://api.github.com/repos/${user}/${repo}/contents/${path}`;
     const headers = {
@@ -611,15 +654,12 @@ async function uploadToGitHubAsCSV(encryptedBase64, user, repo, path, token) {
         'Accept': 'application/vnd.github+json',
         'X-GitHub-Api-Version': '2022-11-28'
     };
-
-    // Create CSV content: single cell with Base64
     const csvContent = `"${encryptedBase64}"`;
-    const base64Content = btoa(unescape(encodeURIComponent(csvContent))); // UTF-8 safe
+    const base64Content = btoa(unescape(encodeURIComponent(csvContent)));
 
     try {
         const getRes = await fetch(url, { headers });
         let body;
-
         if (getRes.status === 404) {
             body = { message: GITHUB_COMMIT_MESSAGE, content: base64Content, branch: GITHUB_BRANCH };
         } else if (getRes.ok) {
@@ -628,7 +668,6 @@ async function uploadToGitHubAsCSV(encryptedBase64, user, repo, path, token) {
         } else {
             throw new Error(`GitHub API error: ${getRes.status}`);
         }
-
         const putRes = await fetch(url, { method: 'PUT', headers, body: JSON.stringify(body) });
         if (putRes.ok) {
             alert(`Uploaded to GitHub!\n${user}/${repo}/blob/${GITHUB_BRANCH}/${path}`);
@@ -641,7 +680,7 @@ async function uploadToGitHubAsCSV(encryptedBase64, user, repo, path, token) {
     }
 }
 
-/* ---------- ENCRYPT ---------- */
+/* ---------- VAULT ENCRYPT/DECRYPT ---------- */
 function addRow(w,l,p){
     const tr = document.createElement('tr');
     tr.innerHTML = `
@@ -669,7 +708,7 @@ function makeCSV(){
     entries.forEach(e => csv += `"${e.website.replace(/"/g,'""')}","${e.login.replace(/"/g,'""')}","${e.password.replace(/"/g,'""')}"\n`);
     return csv;
 }
-async function encryptData(plain,pwd){
+async function encryptDataVault(plain, pwd){
     const salt = crypto.getRandomValues(new Uint8Array(SALT_LEN));
     const iv = crypto.getRandomValues(new Uint8Array(IV_LEN));
     const key = await crypto.subtle.deriveKey(
@@ -684,9 +723,7 @@ async function encryptData(plain,pwd){
     out.set(salt,0); out.set(iv,SALT_LEN); out.set(tag,SALT_LEN+IV_LEN); out.set(enc,SALT_LEN+IV_LEN+TAG_LEN);
     return btoa(String.fromCharCode(...out));
 }
-
-/* ---------- DECRYPT ---------- */
-async function decryptData(b64,pwd){
+async function decryptDataVault(b64,pwd){
     const bin = Uint8Array.from(atob(b64), c=>c.charCodeAt(0));
     const salt = bin.slice(0,SALT_LEN), iv = bin.slice(SALT_LEN,SALT_LEN+IV_LEN);
     const tag = bin.slice(SALT_LEN+IV_LEN,SALT_LEN+IV_LEN+TAG_LEN), ct = bin.slice(SALT_LEN+IV_LEN+TAG_LEN);
@@ -698,35 +735,16 @@ async function decryptData(b64,pwd){
     const full = new Uint8Array(ct.length + TAG_LEN); full.set(ct,0); full.set(tag,ct.length);
     return new TextDecoder().decode(await crypto.subtle.decrypt({name:'AES-GCM',iv}, key, full));
 }
-function showDecrypted(csv){
-    csvPre.textContent = csv; decTitle.textContent = 'Decrypted'; decOut.style.display = 'block';
-    const lines = csv.trim().split('\n'); decTBody.innerHTML = '';
-    for(let i=1;i<lines.length;i++){
-        const m = lines[i].match(/"([^"]*)","([^"]*)","([^"]*)"/) || lines[i].match(/([^,]*),([^,]*),(.*)/);
-        if(!m) continue;
-        const [w, l, p] = [m[1]||m[3]||'', m[2]||'', m[3]||''];
-        if(!w && !l && !p) continue;
-        const tr = document.createElement('tr');
-        tr.innerHTML = `<td>${escHTML(w)}</td><td>${escHTML(l)}</td><td class="password-cell"><span class="password-text">••••••••</span><button class="btn btn-outline btn-small copy-btn">Copy</button></td>`;
-        const show = document.createElement('button');
-        show.className = 'btn btn-outline btn-small password-toggle'; show.textContent = 'Show'; show.dataset.pwd = escHTML(p);
-        show.onclick = () => toggleShow(show);
-        tr.cells[2].nextElementSibling.appendChild(show);
-        tr.querySelector('.copy-btn').onclick = () => copyPass(tr.querySelector('.copy-btn'), p);
-        decTBody.appendChild(tr);
-    }
-    decTable.style.display = decTBody.children.length ? 'table' : 'none';
-}
 
 /* ---------- EVENTS ---------- */
-genMasterBtn.onclick = () => { const p=genStrong(20); masterPassInp.value=p; masterPassInp.type='text'; toggleMasterBtn.textContent='Hide'; copyMasterBtn.style.display='inline-flex'; alert('Generated:\n'+p); loadTokenFromDB(); };
+genMasterBtn.onclick = () => { const p=genStrong(20); masterPassInp.value=p; masterPassInp.type='text'; toggleMasterBtn.textContent='Hide'; copyMasterBtn.style.display='inline-flex'; alert('Generated:\n'+p); };
 genPassBtn.onclick = () => passInp.value = genStrong();
 addBtn.onclick = () => { const w=websiteInp.value.trim(), l=loginInp.value.trim(), p=passInp.value; if(!w||!l||!p) return alert('Fill all'); addRow(w,l,p); websiteInp.value=loginInp.value=passInp.value=''; };
 
 async function doEncrypt() {
     const mp = masterPassInp.value;
     if (!mp || !entries.length) return alert('Enter master password and add entries');
-    const enc = await encryptData(makeCSV(), mp);
+    const enc = await encryptDataVault(makeCSV(), mp);
     encText.textContent = enc;
     encOut.style.display = 'block';
 }
@@ -741,7 +759,7 @@ encryptGithubBtn.onclick = async () => {
     const path = githubPathInp.value.trim();
 
     if (!token && savedTokenEncrypted) {
-        try { token = await loadTokenDecrypted(savedTokenEncrypted, masterPassInp.value); githubTokenInp.value = token; }
+        try { token = await decryptData(savedTokenEncrypted, masterPassInp.value); githubTokenInp.value = token; }
         catch { return alert('Failed to decrypt saved token'); }
     }
     if (!token || !user || !repo || !path) return alert('Fill all GitHub fields!');
@@ -754,7 +772,7 @@ decryptBtn.onclick = async () => {
     const mp = masterPassInp.value.trim(), d = encInput.value.trim();
     if (!mp || !d) return alert('Enter master password and paste data');
     decOut.style.display = 'block'; decTitle.textContent = 'Decrypting...';
-    try { showDecrypted(await decryptData(d, mp)); }
+    try { showDecrypted(await decryptDataVault(d, mp)); }
     catch (e) { decTitle.textContent = 'Failed'; csvPre.textContent = e.message; }
 };
 clearDecBtn.onclick = () => { if(confirm('Clear?')) { encInput.value=''; decOut.style.display='none'; decTable.style.display='none'; }};
@@ -764,8 +782,6 @@ copyEncBtn.onclick = () => copy(encText.textContent).then(() => { copyEncBtn.tex
 dlEncBtn.onclick = () => { const a=document.createElement('a'); a.href=URL.createObjectURL(new Blob([encText.textContent],{type:'text/plain'})); a.download='vault.txt'; a.click(); };
 
 toggleGithubBtn.onclick = () => githubSection.style.display = githubSection.style.display === 'none' ? 'block' : 'none';
-saveTokenBtn.onclick = saveTokenToDB;
-clearTokenBtn.onclick = clearSavedToken;
 uploadGithubBtn.onclick = () => encryptGithubBtn.click();
 
 /* TABS */
@@ -775,13 +791,19 @@ tabDecrypt.onclick = () => { decryptMode.classList.remove('hidden'); encryptMode
 /* ENTER */
 [websiteInp,loginInp,passInp].forEach(i=>i.addEventListener('keydown',e=>e.key==='Enter'&&addBtn.click()));
 
-/* AUTO LOAD & UPDATE PATH */
+/* AUTO LOAD & PATH */
 masterPassInp.addEventListener('input', () => { if (masterPassInp.value.length > 0) loadTokenFromDB(); });
 [githubUserInp, githubRepoInp, githubPathInp].forEach(el => el.addEventListener('input', updatePreviewPath));
 updatePreviewPath();
 
 /* INIT */
-openDB().catch(console.error);
+dbReady.then(() => {
+    console.log('DB ready');
+    if (saveKeyInp.value) loadMasterSecurely();
+}).catch(err => {
+    console.error('DB init failed:', err);
+    alert('Database error. Try clearing browser data for this site.');
+});
 </script>
 </body>
 </html>
