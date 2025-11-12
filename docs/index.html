@@ -5,6 +5,7 @@
 <title>Secure Password Vault</title>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/zxcvbn/4.4.2/zxcvbn.js"></script>
 <style>
     :root {
         --bg: #f8f9fa;
@@ -221,6 +222,24 @@
     .decrypt-file-btn:hover {
         background: #0b5ed7;
     }
+    .strength-meter {
+        height: 4px;
+        background: #eee;
+        border-radius: 2px;
+        overflow: hidden;
+        transition: all 0.3s;
+        margin-top: 6px;
+    }
+    .strength-meter > div {
+        height: 100%;
+        width: 0%;
+        transition: width 0.3s, background 0.3s;
+    }
+    .strength-0 { background: #dc3545; }
+    .strength-1 { background: #fd7e14; }
+    .strength-2 { background: #ffc107; }
+    .strength-3 { background: #28a745; }
+    .strength-4 { background: #007bff; }
     @media (max-width: 768px) {
         .grid-3 { grid-template-columns: 1fr; }
         .flex-between { flex-direction: column; align-items: stretch; }
@@ -249,6 +268,7 @@
                 <button id="toggleMaster" class="btn btn-outline btn-small">Show</button>
                 <button id="copyMaster" class="btn btn-secondary btn-small copy-btn">Copy</button>
             </div>
+            <div id="masterStrength" class="strength-meter"><div></div></div>
             <div id="masterStatus" class="master-status master-notsaved">
                 Master password not saved.
             </div>
@@ -256,6 +276,7 @@
         <div class="form-group">
             <label for="saveKey">Save Key (to unlock saved password)</label>
             <input type="password" id="saveKey" placeholder="Enter a strong save key">
+            <div id="saveKeyStrength" class="strength-meter"><div></div></div>
         </div>
         <div class="flex-center">
             <button id="genMaster" class="btn btn-outline">Generate Strong Master</button>
@@ -272,7 +293,6 @@
 
     <!-- 4. ENCRYPT MODE -->
     <div id="encryptMode">
-        <!-- Input Card -->
         <div class="card">
             <h3>Add New Entry</h3>
             <div class="grid-3">
@@ -297,7 +317,6 @@
             </div>
         </div>
 
-        <!-- Table + Output -->
         <div class="card">
             <table id="entryTable">
                 <thead>
@@ -321,7 +340,6 @@
             </div>
         </div>
 
-        <!-- Action Buttons -->
         <div class="card">
             <div class="flex-between">
                 <button id="encryptDownloadBtn" class="btn btn-success">Encrypt & Download</button>
@@ -353,7 +371,6 @@
                 <button id="loadFilesBtn" class="btn btn-primary">Load Files from GitHub</button>
             </div>
 
-            <!-- File List Table -->
             <div id="fileListSection" class="file-list hidden">
                 <table id="fileListTable">
                     <thead>
@@ -367,7 +384,6 @@
                 </table>
             </div>
 
-            <!-- Manual Paste Fallback -->
             <div class="mt-1">
                 <h4 style="margin:16px 0 8px;">Or Paste Encrypted Data</h4>
                 <textarea id="encryptedInput" placeholder="Paste your encrypted Base64 string here..."></textarea>
@@ -377,7 +393,6 @@
                 </div>
             </div>
 
-            <!-- Decrypted Output -->
             <div id="decryptOutput" class="output">
                 <strong id="decTitle">Decrypted CSV:</strong><br>
                 <pre id="csvText" style="display:none;"></pre>
@@ -386,7 +401,6 @@
                 </div>
             </div>
 
-            <!-- Decrypted Table -->
             <table id="decryptTable" style="margin-top:20px;display:none;">
                 <thead>
                     <tr>
@@ -526,6 +540,7 @@ const tokenStatus     = document.getElementById('tokenStatus');
 let entries = [];
 let savedMasterEncrypted = null;
 let savedTokenEncrypted = null;
+let passwordHideTimer = null;
 
 /* ---------- UTILS ---------- */
 function escHTML(t){const d=document.createElement('div');d.textContent=t;return d.innerHTML;}
@@ -548,6 +563,35 @@ function updatePreviewPath() {
     } else {
         previewPath.textContent = 'Enter user, repo, and path';
     }
+}
+
+/* ---------- SECURITY HARDENING ---------- */
+function updateStrength(input, meterId, minScore = 3) {
+    const val = input.value;
+    const result = zxcvbn(val);
+    const meter = document.querySelector(`#${meterId} > div`);
+    meter.className = `strength-${result.score}`;
+    meter.style.width = `${(result.score + 1) * 20}%`;
+    return result.score >= minScore;
+}
+
+function autoHidePassword(toggleBtn, textSpan, copyBtn, original = '••••••••') {
+    clearTimeout(passwordHideTimer);
+    passwordHideTimer = setTimeout(() => {
+        if (toggleBtn.textContent === 'Hide') {
+            textSpan.textContent = original;
+            toggleBtn.textContent = 'Show';
+            copyBtn.style.display = 'none';
+        }
+    }, 10000);
+}
+
+function isIncognito() {
+    return new Promise((resolve) => {
+        const fs = window.RequestFileSystem || window.webkitRequestFileSystem;
+        if (!fs) { resolve(false); return; }
+        fs(window.TEMPORARY, 100, () => resolve(false), () => resolve(true));
+    });
 }
 
 /* ---------- SECURE STORAGE ---------- */
@@ -585,6 +629,7 @@ async function saveMasterSecurely() {
     const master = masterPassInp.value;
     const key = saveKeyInp.value;
     if (!master || !key) return alert('Enter both master password and save key');
+    if (!updateStrength(saveKeyInp, 'saveKeyStrength', 3)) return alert('Save key too weak! Use at least score 3.');
     try {
         const encrypted = await encryptData(master, key);
         const db = await dbReady;
@@ -635,7 +680,10 @@ async function clearSavedMaster() {
 }
 saveMasterBtn.onclick = saveMasterSecurely;
 clearMasterBtn.onclick = clearSavedMaster;
-saveKeyInp.addEventListener('input', loadMasterSecurely);
+saveKeyInp.addEventListener('input', () => {
+    updateStrength(saveKeyInp, 'saveKeyStrength', 3);
+    loadMasterSecurely();
+});
 
 async function saveTokenToDB() {
     const token = githubTokenInp.value.trim();
@@ -719,7 +767,7 @@ async function downloadFile(user, repo, path, token) {
     if (!res.ok) throw new Error(`Download failed: ${res.status}`);
     const data = await res.json();
     const content = atob(data.content.replace(/\s/g, ''));
-    return content.match(/"([^"]+)"/)[1]; // Extract Base64 from `"base64string"`
+    return content.match(/"([^"]+)"/)[1];
 }
 
 /* ---------- DECRYPT FROM GITHUB ---------- */
@@ -781,8 +829,28 @@ function addRow(w,l,p){
             <button class="btn btn-outline btn-small password-toggle" data-pwd="${escHTML(p)}">Show</button>
             <button class="btn btn-outline btn-small" style="background:#dc3545;color:#fff;" onclick="this.closest('tr').remove();syncEntries();">Delete</button>
         </td>`;
-    tr.querySelector('.password-toggle').onclick = () => toggleShow(tr.querySelector('.password-toggle'));
-    tr.querySelector('.copy-btn').onclick = () => copyPass(tr.querySelector('.copy-btn'), p);
+    const toggleBtn = tr.querySelector('.password-toggle');
+    const textSpan = tr.querySelector('.password-text');
+    const copyBtn = tr.querySelector('.copy-btn');
+    toggleBtn.onclick = () => {
+        if (toggleBtn.textContent === 'Show') {
+            textSpan.textContent = toggleBtn.dataset.pwd;
+            toggleBtn.textContent = 'Hide';
+            copyBtn.style.display = 'inline-flex';
+        } else {
+            textSpan.textContent = '••••••••';
+            toggleBtn.textContent = 'Show';
+            copyBtn.style.display = 'none';
+        }
+        autoHidePassword(toggleBtn, textSpan, copyBtn);
+    };
+    copyBtn.onclick = async () => {
+        if (await copy(toggleBtn.dataset.pwd)) {
+            copyBtn.textContent = 'Copied!';
+            setTimeout(() => copyBtn.textContent = 'Copy', 1500);
+            alert('Password copied! It will auto-hide in 10s.');
+        }
+    };
     tableBody.appendChild(tr);
     syncEntries();
 }
@@ -870,12 +938,14 @@ function showDecrypted(csv) {
                 toggleBtn.textContent = 'Show';
                 copyBtn.style.display = 'none';
             }
+            autoHidePassword(toggleBtn, textSpan, copyBtn);
         };
 
         copyBtn.onclick = async () => {
             if (await copy(p)) {
                 copyBtn.textContent = 'Copied!';
                 setTimeout(() => copyBtn.textContent = 'Copy', 1500);
+                alert('Password copied! It will auto-hide in 10s.');
             }
         };
 
@@ -889,6 +959,31 @@ function showDecrypted(csv) {
 genMasterBtn.onclick = () => { const p=genStrong(20); masterPassInp.value=p; masterPassInp.type='text'; toggleMasterBtn.textContent='Hide'; copyMasterBtn.style.display='inline-flex'; alert('Generated:\n'+p); };
 genPassBtn.onclick = () => passInp.value = genStrong();
 addBtn.onclick = () => { const w=websiteInp.value.trim(), l=loginInp.value.trim(), p=passInp.value; if(!w||!l||!p) return alert('Fill all'); addRow(w,l,p); websiteInp.value=loginInp.value=passInp.value=''; };
+
+toggleMasterBtn.onclick = () => {
+    if (masterPassInp.type === 'password') {
+        masterPassInp.type = 'text';
+        toggleMasterBtn.textContent = 'Hide';
+        copyMasterBtn.style.display = 'inline-flex';
+    } else {
+        masterPassInp.type = 'password';
+        toggleMasterBtn.textContent = 'Show';
+        copyMasterBtn.style.display = 'none';
+    }
+    autoHidePassword(toggleMasterBtn, masterPassInp, copyMasterBtn, masterPassInp.value);
+};
+
+copyMasterBtn.onclick = async () => {
+    if (await copy(masterPassInp.value)) {
+        copyMasterBtn.textContent = 'Copied!';
+        setTimeout(() => copyMasterBtn.textContent = 'Copy', 1500);
+    }
+};
+
+masterPassInp.addEventListener('input', () => {
+    updateStrength(masterPassInp, 'masterStrength', 2);
+    if (masterPassInp.value.length > 0) loadTokenFromDB();
+});
 
 async function doEncrypt() {
     const mp = masterPassInp.value;
@@ -953,7 +1048,6 @@ tabDecrypt.onclick = () => { decryptMode.classList.remove('hidden'); encryptMode
 
 /* ENTER & AUTO */
 [websiteInp,loginInp,passInp].forEach(i=>i.addEventListener('keydown',e=>e.key==='Enter'&&addBtn.click()));
-masterPassInp.addEventListener('input', () => { if (masterPassInp.value.length > 0) loadTokenFromDB(); });
 [githubUserInp, githubRepoInp, githubPathInp].forEach(el => el.addEventListener('input', updatePreviewPath));
 updatePreviewPath();
 
@@ -961,6 +1055,14 @@ updatePreviewPath();
 dbReady.then(() => {
     console.log('DB ready');
     if (saveKeyInp.value) loadMasterSecurely();
+    isIncognito().then(isPrivate => {
+        if (!isPrivate) {
+            const warning = document.createElement('div');
+            warning.style.cssText = 'background:#fff3cd;color:#856404;padding:12px;border-radius:8px;margin:16px 0;font-size:0.9rem;border:1px solid #ffeaa7;';
+            warning.innerHTML = 'Warning: <strong>Not in Incognito/Private mode</strong>. Your vault may be cached. Use private browsing for max security.';
+            document.querySelector('.container').insertBefore(warning, document.querySelector('.card'));
+        }
+    });
 }).catch(err => {
     console.error('DB init failed:', err);
     alert('Database error. Try clearing browser data for this site.');
