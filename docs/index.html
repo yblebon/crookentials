@@ -285,13 +285,43 @@
         </div>
     </div>
 
-    <!-- 3. Mode Tabs -->
+    <!-- 3. GitHub Sync (TOP) -->
+    <div class="card github-card" id="githubSection" style="display:none;">
+        <h3 style="margin-bottom:16px;">GitHub Upload</h3>
+        <div class="form-group">
+            <label for="githubToken">GitHub Token (repo scope)</label>
+            <div class="input-group">
+                <input type="password" id="githubToken" placeholder="ghp_...">
+                <button id="toggleToken" class="btn btn-outline btn-small">Show</button>
+            </div>
+            <div id="tokenStatus" class="token-status token-notsaved">
+                Token not saved. Enter and save.
+            </div>
+        </div>
+        <div class="form-group">
+            <label for="githubPath">File Path</label>
+            <input type="text" id="githubPath" value="uploads/credentials/vault.csv" placeholder="path/to/vault.csv">
+        </div>
+        <div class="flex-center mt-1">
+            <button id="saveToken" class="btn btn-outline">Save Token Securely</button>
+            <button id="clearToken" class="btn btn-outline">Clear Saved Token</button>
+        </div>
+        <p class="info">
+            File will be saved at:<br>
+            <code id="previewPath">uploads/credentials/vault.csv</code>
+        </p>
+    </div>
+    <div class="flex-center">
+        <button id="toggleGithub" class="btn btn-outline">Toggle GitHub Sync</button>
+    </div>
+
+    <!-- 4. Mode Tabs -->
     <div class="card action-bar">
         <button id="tabEncrypt" class="btn btn-primary">Encrypt Mode</button>
         <button id="tabDecrypt" class="btn btn-outline">Decrypt Mode</button>
     </div>
 
-    <!-- 4. ENCRYPT MODE -->
+    <!-- 5. ENCRYPT MODE -->
     <div id="encryptMode">
         <div class="card">
             <h3>Add New Entry</h3>
@@ -349,7 +379,7 @@
         </div>
     </div>
 
-    <!-- 5. DECRYPT MODE -->
+    <!-- 6. DECRYPT MODE -->
     <div id="decryptMode" class="hidden">
         <div class="card">
             <h3>Decrypt from GitHub</h3>
@@ -413,36 +443,6 @@
                 <tbody></tbody>
             </table>
         </div>
-    </div>
-
-    <!-- 6. GitHub Sync -->
-    <div class="card github-card" id="githubSection" style="display:none;">
-        <h3 style="margin-bottom:16px;">GitHub Upload</h3>
-        <div class="form-group">
-            <label for="githubToken">GitHub Token (repo scope)</label>
-            <div class="input-group">
-                <input type="password" id="githubToken" placeholder="ghp_...">
-                <button id="toggleToken" class="btn btn-outline btn-small">Show</button>
-            </div>
-            <div id="tokenStatus" class="token-status token-notsaved">
-                Token not saved. Enter and save.
-            </div>
-        </div>
-        <div class="form-group">
-            <label for="githubPath">File Path</label>
-            <input type="text" id="githubPath" value="uploads/credentials/vault.csv" placeholder="path/to/vault.csv">
-        </div>
-        <div class="flex-center mt-1">
-            <button id="saveToken" class="btn btn-outline">Save Token Securely</button>
-            <button id="clearToken" class="btn btn-outline">Clear Saved Token</button>
-        </div>
-        <p class="info">
-            File will be saved at:<br>
-            <code id="previewPath">uploads/credentials/vault.csv</code>
-        </p>
-    </div>
-    <div class="flex-center">
-        <button id="toggleGithub" class="btn btn-outline">Toggle GitHub Sync</button>
     </div>
 
 </div>
@@ -550,7 +550,7 @@ function genStrong(len=16){
     crypto.getRandomValues(arr);
     return Array.from(arr,x=>chars[x%chars.length]).join('');
 }
-async function copy(txt){
+async function copy(txt){  // FIXED: removed duplicate 'function'
     try{await navigator.clipboard.writeText(txt);return true;}
     catch(e){console.error(e);return false;}
 }
@@ -775,14 +775,14 @@ loadFilesBtn.onclick = async () => {
     const user = githubUserInp.value.trim();
     const repo = githubRepoInp.value.trim();
     const dir = githubDirInp.value.trim();
-    const token = await getToken();
-    if (!user || !repo || !dir || !token) return alert('Fill all GitHub fields and token');
+    const tokenize = await getToken();
+    if (!user || !repo || !dir || !tokenize) return alert('Fill all GitHub fields and token');
 
     fileListTable.innerHTML = '<tr><td colspan="3">Loading...</td></tr>';
     fileListSection.classList.remove('hidden');
 
     try {
-        const files = await listFilesInDirectory(user, repo, dir, token);
+        const files = await listFilesInDirectory(user, repo, dir, tokenize);
         fileListTable.innerHTML = '';
         if (files.length === 0) {
             fileListTable.innerHTML = '<tr><td colspan="3">No CSV files found.</td></tr>';
@@ -795,7 +795,7 @@ loadFilesBtn.onclick = async () => {
                 <td>${file.size} bytes</td>
                 <td><button class="btn decrypt-file-btn" data-path="${file.path}">Decrypt</button></td>
             `;
-            tr.querySelector('.decrypt-file-btn').onclick = () => decryptGitHubFile(file.path, user, repo, token);
+            tr.querySelector('.decrypt-file-btn').onclick = () => decryptGitHubFile(file.path, user, repo, tokenize);
             fileListTable.appendChild(tr);
         });
     } catch (e) {
