@@ -105,7 +105,7 @@
         color: #000;
     }
     .btn-outline:hover {
-        background: #000;
+        background:amd #000;
         color: #fff;
     }
     .btn-small {
@@ -285,9 +285,9 @@
         </div>
     </div>
 
-    <!-- 3. GitHub Sync (TOP) -->
-    <div class="card github-card" id="githubSection" style="display:none;">
-        <h3 style="margin-bottom:16px;">GitHub Upload</h3>
+    <!-- 3. GitHub Sync (Token Only) — NOW ALWAYS VISIBLE -->
+    <div class="card github-card">
+        <h3 style="margin-bottom:16px;">GitHub Token</h3>
         <div class="form-group">
             <label for="githubToken">GitHub Token (repo scope)</label>
             <div class="input-group">
@@ -298,21 +298,13 @@
                 Token not saved. Enter and save.
             </div>
         </div>
-        <div class="form-group">
-            <label for="githubPath">File Path</label>
-            <input type="text" id="githubPath" value="uploads/credentials/vault.csv" placeholder="path/to/vault.csv">
-        </div>
         <div class="flex-center mt-1">
             <button id="saveToken" class="btn btn-outline">Save Token Securely</button>
             <button id="clearToken" class="btn btn-outline">Clear Saved Token</button>
         </div>
         <p class="info">
-            File will be saved at:<br>
-            <code id="previewPath">uploads/credentials/vault.csv</code>
+            User, repo, and file path are set in <strong>Encrypt Mode</strong>.
         </p>
-    </div>
-    <div class="flex-center">
-        <button id="toggleGithub" class="btn btn-outline">Toggle GitHub Sync</button>
     </div>
 
     <!-- 4. Mode Tabs -->
@@ -345,6 +337,29 @@
             <div class="flex-center mt-1">
                 <button id="addEntry" class="btn btn-primary">Add Entry</button>
             </div>
+        </div>
+
+        <!-- FULL GITHUB UPLOAD SETTINGS -->
+        <div class="card">
+            <h3>GitHub Upload Settings</h3>
+            <div class="grid-3">
+                <div class="form-group">
+                    <label for="githubUser">GitHub User / Org</label>
+                    <input type="text" id="githubUser" value="your-username" placeholder="your-username">
+                </div>
+                <div class="form-group">
+                    <label for="githubRepo">Repository</label>
+                    <input type="text" id="githubRepo" value="your-repo" placeholder="my-vault">
+                </div>
+                <div class="form-group">
+                    <label for="githubPath">File Path</label>
+                    <input type="text" id="githubPath" value="uploads/credentials/vault.csv" placeholder="path/to/vault.csv">
+                </div>
+            </div>
+            <p class="info mt-1">
+                File will be saved at:<br>
+                <code id="previewPath">your-username/your-repo/blob/main/uploads/credentials/vault.csv</code>
+            </p>
         </div>
 
         <div class="card">
@@ -385,12 +400,12 @@
             <h3>Decrypt from GitHub</h3>
             <div class="grid-3">
                 <div class="form-group">
-                    <label for="githubUser">GitHub User / Org</label>
-                    <input type="text" id="githubUser" placeholder="your-username">
+                    <label for="githubUserDecrypt">GitHub User / Org</label>
+                    <input type="text" id="githubUserDecrypt" value="your-username" placeholder="your-username">
                 </div>
                 <div class="form-group">
-                    <label for="githubRepo">Repository</label>
-                    <input type="text" id="githubRepo" placeholder="my-vault">
+                    <label for="githubRepoDecrypt">Repository</label>
+                    <input type="text" id="githubRepoDecrypt" value="your-repo" placeholder="my-vault">
                 </div>
                 <div class="form-group">
                     <label for="githubDir">Directory Path</label>
@@ -524,14 +539,15 @@ const fileListTable = document.getElementById('fileListTable').querySelector('tb
 
 const githubUserInp = document.getElementById('githubUser');
 const githubRepoInp = document.getElementById('githubRepo');
-const githubDirInp  = document.getElementById('githubDir');
-const githubTokenInp = document.getElementById('githubToken');
 const githubPathInp = document.getElementById('githubPath');
 const previewPath   = document.getElementById('previewPath');
 
-const toggleGithubBtn = document.getElementById('toggleGithub');
-const githubSection   = document.getElementById('githubSection');
-const toggleTokenBtn  = document.getElementById('toggleToken');
+const githubUserDecryptInp = document.getElementById('githubUserDecrypt');
+const githubRepoDecryptInp = document.getElementById('githubRepoDecrypt');
+const githubDirInp  = document.getElementById('githubDir');
+
+const githubTokenInp = document.getElementById('githubToken');
+const toggleTokenBtn = document.getElementById('toggleToken');
 const saveTokenBtn    = document.getElementById('saveToken');
 const clearTokenBtn   = document.getElementById('clearToken');
 const tokenStatus     = document.getElementById('tokenStatus');
@@ -550,7 +566,7 @@ function genStrong(len=16){
     crypto.getRandomValues(arr);
     return Array.from(arr,x=>chars[x%chars.length]).join('');
 }
-async function copy(txt){  // FIXED: removed duplicate 'function'
+async function copy(txt){
     try{await navigator.clipboard.writeText(txt);return true;}
     catch(e){console.error(e);return false;}
 }
@@ -772,17 +788,17 @@ async function downloadFile(user, repo, path, token) {
 
 /* ---------- DECRYPT FROM GITHUB ---------- */
 loadFilesBtn.onclick = async () => {
-    const user = githubUserInp.value.trim();
-    const repo = githubRepoInp.value.trim();
+    const user = githubUserDecryptInp.value.trim();
+    const repo = githubRepoDecryptInp.value.trim();
     const dir = githubDirInp.value.trim();
-    const tokenize = await getToken();
-    if (!user || !repo || !dir || !tokenize) return alert('Fill all GitHub fields and token');
+    const token = await getToken();
+    if (!user || !repo || !dir || !token) return alert('Fill all GitHub fields and token');
 
     fileListTable.innerHTML = '<tr><td colspan="3">Loading...</td></tr>';
     fileListSection.classList.remove('hidden');
 
     try {
-        const files = await listFilesInDirectory(user, repo, dir, tokenize);
+        const files = await listFilesInDirectory(user, repo, dir, token);
         fileListTable.innerHTML = '';
         if (files.length === 0) {
             fileListTable.innerHTML = '<tr><td colspan="3">No CSV files found.</td></tr>';
@@ -795,7 +811,7 @@ loadFilesBtn.onclick = async () => {
                 <td>${file.size} bytes</td>
                 <td><button class="btn decrypt-file-btn" data-path="${file.path}">Decrypt</button></td>
             `;
-            tr.querySelector('.decrypt-file-btn').onclick = () => decryptGitHubFile(file.path, user, repo, tokenize);
+            tr.querySelector('.decrypt-file-btn').onclick = () => decryptGitHubFile(file.path, user, repo, token);
             fileListTable.appendChild(tr);
         });
     } catch (e) {
@@ -1027,7 +1043,7 @@ async function uploadToGitHubAsCSV(encryptedBase64, user, repo, path, token) {
 }
 
 clearAllBtn.onclick = () => { if(confirm('Clear all?')) { tableBody.innerHTML=''; entries=[]; encOut.style.display='none'; }};
-decryptBtn.onclick = async () => {
+decryptBtn.onclick = async () => { 
     const mp = masterPassInp.value.trim(), d = encInput.value.trim();
     if (!mp || !d) return alert('Enter master password and paste data');
     decOut.style.display = 'block'; decTitle.textContent = 'Decrypting...';
@@ -1039,8 +1055,6 @@ dlCsvBtn.onclick = () => { const a=document.createElement('a'); a.href=URL.creat
 
 copyEncBtn.onclick = () => copy(encText.textContent).then(() => { copyEncBtn.textContent='Copied!'; setTimeout(() => copyEncBtn.textContent='Copy',1500); });
 dlEncBtn.onclick = () => { const a=document.createElement('a'); a.href=URL.createObjectURL(new Blob([encText.textContent],{type:'text/plain'})); a.download='vault.txt'; a.click(); };
-
-toggleGithubBtn.onclick = () => githubSection.style.display = githubSection.style.display === 'none' ? 'block' : 'none';
 
 /* TABS */
 tabEncrypt.onclick = () => { encryptMode.classList.remove('hidden'); decryptMode.classList.add('hidden'); tabEncrypt.classList.replace('btn-outline','btn-primary'); tabDecrypt.classList.replace('btn-primary','btn-outline'); };
