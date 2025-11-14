@@ -105,7 +105,7 @@
         color: #000;
     }
     .btn-outline:hover {
-        background:amd #000;
+        background: #000;
         color: #fff;
     }
     .btn-small {
@@ -124,6 +124,11 @@
     .grid-3 {
         display: grid;
         grid-template-columns: 1fr 1fr 1fr;
+        gap: 12px;
+    }
+    .grid-4 {
+        display: grid;
+        grid-template-columns: 1fr 1fr 1fr 1fr;
         gap: 12px;
     }
     .flex-between {
@@ -240,8 +245,44 @@
     .strength-2 { background: #ffc107; }
     .strength-3 { background: #28a745; }
     .strength-4 { background: #007bff; }
+    .optional-hint {
+        font-size: 0.8rem;
+        color: #777;
+        font-style: italic;
+        margin-top: 4px;
+    }
+    .confirm-dialog {
+        position: fixed;
+        top: 0; left: 0; right: 0; bottom: 0;
+        background: rgba(0,0,0,0.7);
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        z-index: 9999;
+    }
+    .confirm-box {
+        background: white;
+        border-radius: 12px;
+        padding: 24px;
+        max-width: 400px;
+        width: 90%;
+        box-shadow: 0 8px 32px rgba(0,0,0,0.2);
+        text-align: center;
+    }
+    .confirm-box h3 {
+        margin-bottom: 16px;
+        color: #000;
+    }
+    .confirm-box p {
+        margin-bottom: 20px;
+        color: #555;
+        line-height: 1.5;
+    }
+    .confirm-box .btn {
+        margin: 0 8px;
+    }
     @media (max-width: 768px) {
-        .grid-3 { grid-template-columns: 1fr; }
+        .grid-3, .grid-4 { grid-template-columns: 1fr; }
         .flex-between { flex-direction: column; align-items: stretch; }
         .subtitle { font-size: 0.9rem; }
     }
@@ -285,7 +326,7 @@
         </div>
     </div>
 
-    <!-- 3. GitHub Sync (Token Only) — NOW ALWAYS VISIBLE -->
+    <!-- 3. GitHub Sync (Token Only) — ALWAYS VISIBLE -->
     <div class="card github-card">
         <h3 style="margin-bottom:16px;">GitHub Token</h3>
         <div class="form-group">
@@ -339,10 +380,10 @@
             </div>
         </div>
 
-        <!-- FULL GITHUB UPLOAD SETTINGS -->
+        <!-- GITHUB SETTINGS + FILENAME -->
         <div class="card">
             <h3>GitHub Upload Settings</h3>
-            <div class="grid-3">
+            <div class="grid-4">
                 <div class="form-group">
                     <label for="githubUser">GitHub User / Org</label>
                     <input type="text" id="githubUser" value="your-username" placeholder="your-username">
@@ -352,8 +393,13 @@
                     <input type="text" id="githubRepo" value="your-repo" placeholder="my-vault">
                 </div>
                 <div class="form-group">
-                    <label for="githubPath">File Path</label>
-                    <input type="text" id="githubPath" value="uploads/credentials/vault.csv" placeholder="path/to/vault.csv">
+                    <label for="githubPath">Directory Path</label>
+                    <input type="text" id="githubPath" value="uploads/credentials" placeholder="folder/to/save">
+                </div>
+                <div class="form-group">
+                    <label for="githubFilename">Filename (optional)</label>
+                    <input type="text" id="githubFilename" placeholder="vault.csv">
+                    <p class="optional-hint">Leave blank to use <code>vault.csv</code></p>
                 </div>
             </div>
             <p class="info mt-1">
@@ -462,6 +508,19 @@
 
 </div>
 
+<!-- CONFIRM DIALOG -->
+<div id="confirmDialog" class="confirm-dialog hidden">
+    <div class="confirm-box">
+        <h3>Confirm Upload</h3>
+        <p>You're about to overwrite <strong>vault.csv</strong> — the default filename.<br><br>
+           Are you sure you want to proceed?</p>
+        <div>
+            <button id="confirmYes" class="btn btn-success">Yes, Upload</button>
+            <button id="confirmNo" class="btn btn-outline">Cancel</button>
+        </div>
+    </div>
+</div>
+
 <script>
 /* ---------- CONFIG ---------- */
 const PBKDF2_ITERATIONS = 200000;
@@ -540,6 +599,7 @@ const fileListTable = document.getElementById('fileListTable').querySelector('tb
 const githubUserInp = document.getElementById('githubUser');
 const githubRepoInp = document.getElementById('githubRepo');
 const githubPathInp = document.getElementById('githubPath');
+const githubFilenameInp = document.getElementById('githubFilename');
 const previewPath   = document.getElementById('previewPath');
 
 const githubUserDecryptInp = document.getElementById('githubUserDecrypt');
@@ -551,6 +611,12 @@ const toggleTokenBtn = document.getElementById('toggleToken');
 const saveTokenBtn    = document.getElementById('saveToken');
 const clearTokenBtn   = document.getElementById('clearToken');
 const tokenStatus     = document.getElementById('tokenStatus');
+
+/* CONFIRM DIALOG */
+const confirmDialog = document.getElementById('confirmDialog');
+const confirmYes = document.getElementById('confirmYes');
+const confirmNo = document.getElementById('confirmNo');
+let pendingUpload = null;
 
 /* ---------- STATE ---------- */
 let entries = [];
@@ -570,12 +636,22 @@ async function copy(txt){
     try{await navigator.clipboard.writeText(txt);return true;}
     catch(e){console.error(e);return false;}
 }
+function getFinalFilename() {
+    const filename = githubFilenameInp.value.trim();
+    return filename || 'vault.csv';
+}
+function isDefaultFilename() {
+    const filename = githubFilenameInp.value.trim();
+    return !filename || filename === 'vault.csv';
+}
 function updatePreviewPath() {
     const user = githubUserInp.value.trim();
     const repo = githubRepoInp.value.trim();
-    const path = githubPathInp.value.trim();
-    if (user && repo && path) {
-        previewPath.textContent = `${user}/${repo}/blob/${GITHUB_BRANCH}/${path}`;
+    const dir = githubPathInp.value.trim().replace(/\/+$/, '');
+    const filename = getFinalFilename();
+    const fullPath = dir ? `${dir}/${filename}` : filename;
+    if (user && repo) {
+        previewPath.textContent = `${user}/${repo}/blob/${GITHUB_BRANCH}/${fullPath}`;
     } else {
         previewPath.textContent = 'Enter user, repo, and path';
     }
@@ -1009,16 +1085,48 @@ async function doEncrypt() {
     encOut.style.display = 'block';
 }
 
-encryptDownloadBtn.onclick = doEncrypt;
+// Modified GitHub Upload with Confirmation
 encryptGithubBtn.onclick = async () => {
     await doEncrypt();
     if (!encText.textContent) return;
+
     const token = await getToken();
     const user = githubUserInp.value.trim();
     const repo = githubRepoInp.value.trim();
-    const path = githubPathInp.value.trim();
-    if (!token || !user || !repo || !path) return alert('Fill all GitHub fields!');
-    await uploadToGitHubAsCSV(encText.textContent, user, repo, path, token);
+    const dir = githubPathInp.value.trim().replace(/\/+$/, '');
+    const filename = getFinalFilename();
+    const fullPath = dir ? `${dir}/${filename}` : filename;
+
+    if (!token || !user || !repo) return alert('Fill all GitHub fields!');
+
+    if (isDefaultFilename()) {
+        // Show confirmation dialog
+        pendingUpload = { encryptedBase64: encText.textContent, user, repo, fullPath, token };
+        confirmDialog.classList.remove('hidden');
+    } else {
+        // Upload immediately if not default
+        await uploadToGitHubAsCSV(encText.textContent, user, repo, fullPath, token);
+    }
+};
+
+// Confirm Dialog Handlers
+confirmYes.onclick = async () => {
+    confirmDialog.classList.add('hidden');
+    if (pendingUpload) {
+        await uploadToGitHubAsCSV(
+            pendingUpload.encryptedBase64,
+            pendingUpload.user,
+            pendingUpload.repo,
+            pendingUpload.fullPath,
+            pendingUpload.token
+        );
+        pendingUpload = null;
+    }
+};
+
+confirmNo.onclick = () => {
+    confirmDialog.classList.add('hidden');
+    pendingUpload = null;
 };
 
 async function uploadToGitHubAsCSV(encryptedBase64, user, repo, path, token) {
@@ -1062,7 +1170,7 @@ tabDecrypt.onclick = () => { decryptMode.classList.remove('hidden'); encryptMode
 
 /* ENTER & AUTO */
 [websiteInp,loginInp,passInp].forEach(i=>i.addEventListener('keydown',e=>e.key==='Enter'&&addBtn.click()));
-[githubUserInp, githubRepoInp, githubPathInp].forEach(el => el.addEventListener('input', updatePreviewPath));
+[githubUserInp, githubRepoInp, githubPathInp, githubFilenameInp].forEach(el => el.addEventListener('input', updatePreviewPath));
 updatePreviewPath();
 
 /* INIT */
