@@ -438,12 +438,12 @@
             </div>
             
             <div class="button-group-row">
-                 <button type="button" class="save-button" onclick="saveCredentials()">💾 Save Credentials Locally</button>
-                 <button type="button" class="save-button" onclick="deleteCredentials()" style="background-color: var(--error-red);">🗑️ Clear Credentials</button>
+                 <button type="button" class="save-button" onclick="saveCredentials()">💾 Save Token Locally (Recommended)</button>
+                 <button type="button" class="save-button" onclick="deleteCredentials()" style="background-color: var(--error-red);">🗑️ Clear All Saved Credentials</button>
             </div>
 
             <p id="key_status_hint" style="margin-top: 10px; font-size: 0.85em; display: block; color: var(--success-green);">
-                ✅ Stateless Key Mode: Keys are derived on-the-fly using a unique, per-entry salt stored in the GitHub file.
+                ✅ **Security Best Practice:** Only the **GitHub Token** is automatically loaded from local storage. **Always re-enter your Master Password** for maximum security.
             </p>
         </div>
         
@@ -559,7 +559,7 @@
                 if (!response.ok) throw new Error(`HTTP error! Status: ${response.status}`);
                 config = await response.json();
                 
-                // === LOGIC FOR FILLING TOKEN FROM CONFIG ===
+                // === LOGIC FOR FILLING TOKEN FROM CONFIG (IF NO LOCAL SAVE) ===
                 const tokenInput = document.getElementById('github_token_input');
                 const ghConfig = config.github_config;
 
@@ -614,6 +614,7 @@
             });
         }
 
+        // NOTE: We only save the GitHub token and an empty/null Master Password
         async function saveCreds(masterPassword, githubToken) {
             try {
                 const db = await openCredsDB();
@@ -621,7 +622,7 @@
                 const store = tx.objectStore(STORE_NAME);
                 
                 const data = { 
-                    masterPassword: masterPassword, 
+                    masterPassword: masterPassword, // This will be saved, but recommended to be blank
                     githubToken: githubToken,
                     savedAt: new Date().toISOString()
                 };
@@ -675,40 +676,59 @@
         
         async function loadStoredCredentials() {
             const creds = await getCreds();
-            if (creds && creds.masterPassword && creds.githubToken) {
-                 document.getElementById('master_password').value = creds.masterPassword;
-                 document.getElementById('github_token_input').value = creds.githubToken; 
-                 setStatus("Credentials loaded automatically from local storage.", false);
+            const tokenInput = document.getElementById('github_token_input');
+            const masterPasswordInput = document.getElementById('master_password');
+            
+            if (creds && creds.githubToken) {
+                 // 1. ALWAYS load the GitHub token if it exists
+                 tokenInput.value = creds.githubToken;
+                 
+                 // 2. DO NOT load the Master Password, even if it's saved.
+                 // This enforces the security best practice of re-entering the key.
+                 masterPasswordInput.value = ''; 
+                 
+                 setStatus("GitHub Token loaded automatically from local storage. Please re-enter your Master Password.", false);
             } else if (creds) {
                  await deleteCreds();
             }
         }
 
-        // --- UI Callbacks for Credential Management ---
+        // --- UI Callbacks for Credential Management (UPDATED) ---
 
         async function saveCredentials() {
-            const masterPassword = document.getElementById("master_password").value;
+            let masterPassword = document.getElementById("master_password").value;
             const githubToken = document.getElementById("github_token_input").value;
 
-            if (masterPassword.length < 8) {
-                 setStatus("Master Password must be at least 8 characters long to save.", true);
-                 return;
-            }
             if (githubToken.length === 0 || githubToken === 'YOUR_PERSONAL_ACCESS_TOKEN') {
                  setStatus("GitHub Token must be entered to save.", true);
                  return;
             }
 
+            // Security check and advisory
+            if (masterPassword.length > 0) {
+                 const confirmSaveMP = confirm("SECURITY WARNING: It is strongly recommended to NOT save your Master Password in the browser. Do you wish to clear the Master Password field but save the GitHub Token?");
+                 if (confirmSaveMP) {
+                      masterPassword = ''; // Set to blank for saving
+                 } else {
+                      // If user insists on saving, proceed, but still advise
+                      setStatus("WARNING: Master Password saved. It is highly recommended to clear it from local storage after use.", true);
+                 }
+            }
+
             try {
                  await saveCreds(masterPassword, githubToken);
-                 setStatus("✅ Master Password and GitHub Token saved securely to local browser storage.", false);
+                 
+                 // Clear the field after saving/advising
+                 document.getElementById('master_password').value = ''; 
+                 
+                 setStatus("✅ GitHub Token saved securely. Master Password field cleared (as advised).", false);
             } catch (error) {
                  setStatus(`Error saving credentials: ${error.message}`, true);
             }
         }
         
         async function deleteCredentials() {
-            const confirmDelete = confirm("Are you sure you want to permanently clear the saved credentials from your browser?");
+            const confirmDelete = confirm("Are you sure you want to permanently clear the saved credentials (Token and Password) from your browser?");
             if (!confirmDelete) return;
 
             try {
@@ -721,13 +741,13 @@
             }
         }
 
-        // --- Cryptography Functions (UPDATED FOR STATELESS) ---
+        // --- Cryptography Functions (NO REDUNDANT HMAC) ---
 
         /**
-         * Stateless key derivation: derives keys using Master Password and a unique per-entry salt.
+         * Stateless key derivation: derives ONLY the Cipher Key using Master Password and a unique per-entry salt.
          * @param {string} masterPassword - The user's master key.
          * @param {Uint8Array} salt - A unique salt for the entry (must be stored with the entry data).
-         * @returns {Promise<{cipherKey: CryptoKey, hmacKey: CryptoKey}>}
+         * @returns {Promise<{cipherKey: CryptoKey}>}
          */
         async function deriveKeys(masterPassword, salt) {
             const C = config.crypto_config;
@@ -736,99 +756,74 @@
                 "raw", new TextEncoder().encode(masterPassword), { name: "PBKDF2" }, false, ["deriveKey", "deriveBits"]
             );
             
+            // Derive only 256 bits (32 bytes) for the single AES-256-GCM key
             const derivedBits = await window.crypto.subtle.deriveBits(
                 {
                     name: "PBKDF2",
-                    salt: salt, // Uses the per-entry salt
+                    salt: salt, 
                     iterations: C.pbkdf2_iterations,
                     hash: C.pbkdf2_hash_algo,
                 },
                 masterKey,
-                512 
+                256 // Reduced from 512
             );
             
             const derivedBitsArray = new Uint8Array(derivedBits);
             
             const cipherBits = derivedBitsArray.slice(0, 32); 
-            const hmacBits = derivedBitsArray.slice(32, 64); 
 
             const cipherKey = await window.crypto.subtle.importKey(
                 "raw", cipherBits, { name: C.key_algo_name, length: C.key_algo_length }, true, ["encrypt", "decrypt"]
             );
             
-            const hmacKey = await window.crypto.subtle.importKey(
-                "raw", hmacBits, { name: C.hmac_algo_name, hash: {name: C.hmac_hash_algo} }, true, ["sign", "verify"]
-            );
-            
-            return { cipherKey, hmacKey };
+            return { cipherKey };
         }
         
         /**
          * Encrypts data using a newly generated salt and returns the package including salt.
+         * NOTE: Relies on AES-GCM's built-in tag for integrity; no external HMAC is used.
          * @param {string} masterPassword - The user's master key.
          * @param {string} data - The JSON string data to encrypt.
-         * @returns {Promise<{ciphertext: number[], iv: number[], tag: number[], salt: number[]}>}
+         * @returns {Promise<{ciphertext: number[], iv: number[], salt: number[]}>}
          */
         async function encryptData(masterPassword, data) {
             const C = config.crypto_config;
             const encodedData = new TextEncoder().encode(data);
             const iv = window.crypto.getRandomValues(new Uint8Array(12)); 
-            const salt = window.crypto.getRandomValues(new Uint8Array(16)); // NEW: Generate per-entry salt
+            const salt = window.crypto.getRandomValues(new Uint8Array(16)); 
             
-            // 1. Derive keys using the new salt
-            const { cipherKey, hmacKey } = await deriveKeys(masterPassword, salt);
+            // 1. Derive cipher key (only one key now)
+            const { cipherKey } = await deriveKeys(masterPassword, salt);
 
-            // 2. Encrypt
-            const ciphertext = await window.crypto.subtle.encrypt(
+            // 2. Encrypt (Output contains the GCM tag appended to the ciphertext)
+            const ciphertextWithTag = await window.crypto.subtle.encrypt(
                 { name: C.key_algo_name, iv: iv }, 
                 cipherKey,
                 encodedData
             );
             
-            // 3. Sign
-            const signature = await window.crypto.subtle.sign(
-                { name: C.hmac_algo_name },
-                hmacKey,
-                new Uint8Array(ciphertext)
-            );
-
+            // 3. Return package
             return {
-                ciphertext: Array.from(new Uint8Array(ciphertext)),
+                ciphertext: Array.from(new Uint8Array(ciphertextWithTag)),
                 iv: Array.from(iv),
-                tag: Array.from(new Uint8Array(signature)),
-                salt: Array.from(salt) // NEW: Include salt in the package
+                salt: Array.from(salt) 
+                // NOTE: The HMAC 'tag' field is removed.
             };
         }
 
         /**
-         * Decrypts data using derived keys.
+         * Decrypts data using derived keys. Relies on AES-GCM's internal tag verification.
          * @param {CryptoKey} cipherKey - The derived cipher key.
-         * @param {CryptoKey} hmacKey - The derived HMAC key.
          * @param {number[]} iv - Initialization vector.
-         * @param {number[]} ciphertext - Encrypted data.
-         * @param {number[]} tag - HMAC signature.
+         * @param {number[]} ciphertext - Encrypted data (including GCM tag).
          * @returns {Promise<string>}
          */
-        async function decryptData(cipherKey, hmacKey, iv, ciphertext, tag) {
+        async function decryptData(cipherKey, iv, ciphertext) {
             const C = config.crypto_config;
             const ciphertextArray = new Uint8Array(ciphertext);
             
-            if (!tag) {
-                 console.warn("Legacy file detected: HMAC tag missing. Decryption proceeding without integrity check.");
-            } else {
-                 const tagArray = new Uint8Array(tag);
-                 const isTagValid = await window.crypto.subtle.verify(
-                     { name: C.hmac_algo_name },
-                     hmacKey,
-                     tagArray,
-                     ciphertextArray 
-                 );
-                 
-                 if (!isTagValid) {
-                     throw new Error("Authentication failed. Invalid Master Password or corrupted data.");
-                 }
-            }
-            
+            // Decrypt automatically performs GCM tag verification. 
+            // If verification fails, it throws an OperationError.
             const decrypted = await window.crypto.subtle.decrypt(
                 { name: C.key_algo_name, iv: new Uint8Array(iv) },
                 cipherKey,
@@ -935,8 +930,8 @@
                         encrypted_data: JSON.stringify({
                             ciphertext: encryptedPackage.ciphertext,
                             iv: encryptedPackage.iv,
-                            tag: encryptedPackage.tag,
-                            salt: encryptedPackage.salt // NEW: Send the unique salt
+                            // NOTE: 'tag' is removed
+                            salt: encryptedPackage.salt 
                         })
                     }
                 });
@@ -968,7 +963,7 @@
         }
 
 
-        // --- LISTING & UI UTILITIES ---
+        // --- LISTING & UI UTILITIES (Unchanged) ---
 
         function switchMenu(menu) {
             document.getElementById('form_view').style.display = menu === 'entry' ? 'block' : 'none';
@@ -1248,21 +1243,19 @@
                      throw new Error("Encrypted data structure is incomplete (missing IV or Ciphertext). File corrupted.");
                 }
                 
-                // NEW: Check for salt (required for new stateless files)
+                // Check for salt (required for new stateless files)
                 if (!encryptedPackage.salt) {
                      throw new Error("Missing 'salt' in file. File was encrypted in a previous, incompatible version.");
                 }
                 
-                // 2. Derive the Decryption Keys using the salt from the file
-                const { cipherKey, hmacKey } = await deriveKeys(masterPassword, new Uint8Array(encryptedPackage.salt)); 
+                // 2. Derive the Decryption Key (only cipherKey)
+                const { cipherKey } = await deriveKeys(masterPassword, new Uint8Array(encryptedPackage.salt)); 
                  
-                // 3. Decrypt the data
+                // 3. Decrypt the data (Decryption will fail if GCM tag is invalid)
                 const decryptedJsonString = await decryptData(
                     cipherKey, 
-                    hmacKey, 
                     encryptedPackage.iv, 
-                    encryptedPackage.ciphertext,
-                    encryptedPackage.tag 
+                    encryptedPackage.ciphertext
                 );
                  
                 // 4. Parse and display the result
@@ -1270,7 +1263,7 @@
                 
                 // --- Display Logic ---
                 const container = document.createElement('div');
-                const integrityMessage = encryptedPackage.tag ? 'HMAC verified' : 'Legacy file - NO integrity check';
+                const integrityMessage = encryptedPackage.tag ? 'NOTE: Legacy file with redundant tag detected.' : 'AES-GCM tag verified.';
                 container.innerHTML = `<p class="status-success" style="padding: 10px; margin-bottom: 10px; font-weight: 500;">Decryption successful! (${integrityMessage})</p>`;
                 const contentBox = document.createElement('div');
                 contentBox.className = 'content-box';
@@ -1387,10 +1380,11 @@
              } catch (error) {
                  console.error("Decryption failed:", error);
                  let errorMessage = error.message;
-                 if (errorMessage.includes("Authentication failed")) {
+                 if (errorMessage.includes("Authentication failed") || error.name === "OperationError") {
+                    // OperationError is what WebCrypto throws on GCM tag verification failure
                     errorMessage = "Decryption failed! The **Master Password** is incorrect or the data is corrupted.";
                  } else if (errorMessage.includes("Missing 'salt'")) {
-                     errorMessage = "Decryption failed! This file is from an old, incompatible version. Please re-encrypt it or create a new entry.";
+                     errorMessage = "Decryption failed! This file is from an old, incompatible version.";
                  } else if (errorMessage.includes("Failed to fetch file content")) {
                     errorMessage = `Failed to fetch file: Check your GitHub Token permissions or if the file exists.`;
                  }
@@ -1504,6 +1498,7 @@
         
         async function copyStringValue(value, buttonElement) {
             try {
+                // Use modern Clipboard API to avoid selecting the input field
                 await navigator.clipboard.writeText(value);
                 
                 const originalText = buttonElement.innerHTML;
@@ -1530,11 +1525,20 @@
 
         function copyToClipboard(inputId) { 
             const input = document.getElementById(inputId);
+            // NOTE: Keep old method for inputs without a dedicated copy button for simplicity
             input.select();
             input.setSelectionRange(0, 99999); 
             navigator.clipboard.writeText(input.value)
                 .then(() => {
-                    alert(`Copied ${input.tagName === 'TEXTAREA' ? 'Content' : inputId.replace('_', ' ')} to clipboard!`);
+                    // Find the copy button associated with this input
+                    const copyButton = input.parentElement.querySelector(`button[onclick*="copyToClipboard('${inputId}')"]`);
+                    if(copyButton) {
+                        const originalText = copyButton.innerHTML;
+                        copyButton.innerHTML = '✔️ Copied!';
+                        setTimeout(() => { copyButton.innerHTML = originalText; }, 1500);
+                    } else {
+                         alert(`Copied ${inputId.replace('_', ' ')} to clipboard!`);
+                    }
                 })
                 .catch(err => {
                     console.error('Failed to copy: ', err);
@@ -1547,7 +1551,7 @@
             await loadConfig();
             
             if (config) {
-                // 2. Load locally stored credentials (and overwrite token if saved locally)
+                // 2. Load locally stored credentials (GitHub Token ONLY)
                 await loadStoredCredentials(); 
                 
                 // 3. UI Setup
