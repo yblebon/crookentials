@@ -1,0 +1,22 @@
+{
+    "github_config": {
+        "repository": "yblebon/vault",
+        "username": "yblebon",
+        "token": "",
+        "workflow_name": "upload-secret.yml",
+        "delete_workflow_name": "delete-secret.yml"
+    },
+    "crypto_config": {
+        "db_name": "SecurePasswordStore",
+        "db_version": 2,
+        "store_name": "masterKeys",
+        "key_id": "master_key_data",
+        "pbkdf2_iterations": 100000,
+        "pbkdf2_hash_algo": "SHA-256",
+        "key_algo_name": "AES-GCM",
+        "key_algo_length": 256,
+        "hmac_algo_name": "HMAC",
+        "hmac_hash_algo": "SHA-256",
+        "master_key_timeout_minutes": 5
+    }
+}
