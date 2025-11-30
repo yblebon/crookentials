@@ -3,63 +3,77 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Secure Vault - Entry & Listing</title>
+    <title>Secure Vault - Stateless Key Mode</title>
     <style>
+        /* COLOR PALETTE */
+        :root {
+            --primary-blue: #1A73E8; 
+            --primary-dark: #174EA6;
+            --success-green: #34A853;
+            --error-red: #EA4335;
+            --background-light: #F8F9FA;
+            --surface-white: #FFFFFF;
+            --text-dark: #202124;
+            --text-medium: #5F6368;
+        }
+
         /* BASE STYLES & TYPOGRAPHY */
         body {
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-            background-color: #f0f2f5; /* Light, modern background */
+            font-family: Roboto, Arial, sans-serif;
+            background-color: var(--background-light);
             display: flex;
             justify-content: center;
-            align-items: flex-start; /* Align to top */
+            align-items: flex-start; 
             min-height: 100vh;
             padding-top: 50px;
             margin: 0;
         }
         .container {
-            background-color: #ffffff;
+            background-color: var(--surface-white);
             padding: 30px;
-            border-radius: 12px;
-            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1); /* Subtle elevation */
-            width: 700px; /* Slightly wider container */
+            border-radius: 8px; 
+            box-shadow: 0 1px 3px 0 rgba(60, 64, 67, 0.302), 0 4px 8px 3px rgba(60, 64, 67, 0.149); 
+            width: 750px; 
             max-width: 95%;
         }
         h2 {
             text-align: center;
             margin-bottom: 25px;
-            color: #333;
-            font-weight: 600;
+            color: var(--text-dark);
+            font-weight: 500; 
         }
         h3, h4 {
-            color: #444;
-            border-bottom: 1px solid #eee;
+            color: var(--text-dark);
+            border-bottom: 1px solid #E8EAED;
             padding-bottom: 8px;
             margin-bottom: 15px;
+            font-weight: 500;
         }
         .form-group {
-            margin-bottom: 20px;
+            margin-bottom: 24px;
         }
         label {
             display: block;
-            margin-bottom: 6px;
+            margin-bottom: 4px;
             font-weight: 500;
-            color: #555;
-            font-size: 0.95em;
+            color: var(--text-medium);
+            font-size: 0.9em;
         }
         
-        /* INPUT AND BUTTON BASE STYLES */
+        /* INPUT STYLING */
         input:not([type="checkbox"]), textarea {
             width: 100%;
-            padding: 10px 12px;
-            border: 1px solid #ddd;
-            border-radius: 6px;
+            padding: 12px 12px;
+            border: 1px solid #DADCE0; 
+            border-radius: 4px; 
             box-sizing: border-box;
             transition: border-color 0.2s, box-shadow 0.2s;
             font-size: 1em;
+            color: var(--text-dark);
         }
         input:focus, textarea:focus {
-            border-color: #007bff;
-            box-shadow: 0 0 0 3px rgba(0, 123, 255, 0.25);
+            border-color: var(--primary-blue);
+            box-shadow: 0 0 0 1px var(--primary-blue);
             outline: none;
         }
         textarea {
@@ -67,99 +81,124 @@
             resize: vertical; 
         }
 
-        /* UTILITY BUTTONS (Eye, Copy, Generate) */
+        /* UTILITY BUTTONS */
         .utility-button, button.copy-utility-button {
             background: none;
             border: none;
             cursor: pointer;
-            padding: 0 8px;
-            font-size: 1.1em;
+            padding: 8px; 
+            font-size: 1.2em; 
             line-height: 1; 
-            color: #888;
+            color: var(--text-medium);
             transition: color 0.2s;
         }
         .utility-button:hover, button.copy-utility-button:hover {
-            color: #007bff;
+            color: var(--primary-blue);
         }
         .input-utility-group {
             display: flex;
             align-items: center;
-            border: 1px solid #ddd;
-            border-radius: 6px;
-            padding-right: 5px; 
-            background-color: #fff;
+            border: 1px solid #DADCE0;
+            border-radius: 4px;
+            padding-right: 0; 
+            background-color: var(--surface-white);
+        }
+        .input-utility-group:focus-within {
+             border: 1px solid var(--primary-blue);
+             box-shadow: 0 0 0 1px var(--primary-blue);
         }
         .input-utility-group input, .input-utility-group textarea {
             border: none;
-            padding: 10px 12px;
+            padding: 12px;
+            box-shadow: none;
+        }
+        .input-utility-group .utility-button {
+             padding: 0 12px;
         }
         
-        /* PRIMARY ACTION BUTTONS (Submit, Refresh) */
+        /* PRIMARY ACTION BUTTONS */
         button[type="submit"], 
         .list-utility-row button, 
-        .password-group button:not(.utility-button) {
-            padding: 10px 15px;
-            color: white;
+        .password-group button:not(.utility-button),
+        .save-button {
+            padding: 10px 20px;
+            color: var(--surface-white);
             border: none;
-            border-radius: 6px;
+            border-radius: 4px;
             cursor: pointer;
-            font-size: 16px;
+            font-size: 14px;
             font-weight: 500;
-            margin-left: 5px;
+            margin-left: 8px;
             transition: background-color 0.2s, box-shadow 0.2s;
+            box-shadow: 0 1px 2px 0 rgba(60,64,67,.3), 0 1px 3px 1px rgba(60,64,67,.15); 
         }
         
         button[type="submit"] {
             width: 100%;
-            background-color: #007bff;
+            background-color: var(--primary-blue);
             margin-top: 20px; 
+            margin-left: 0;
         }
         button[type="submit"]:hover {
-            background-color: #0056b3;
-            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+            background-color: var(--primary-dark);
+            box-shadow: 0 2px 3px 0 rgba(60,64,67,.3), 0 2px 6px 2px rgba(60,64,67,.15);
         }
         
         /* GENERATE BUTTONS */
         .password-group button:not(.utility-button) {
-            background-color: #17a2b8; /* Info blue */
+            background-color: #3C4043; 
         }
         .password-group button:not(.utility-button):hover {
-            background-color: #138496;
-        }
-        .list-utility-row button {
-            background-color: #6c757d; /* Secondary gray */
-        }
-        .list-utility-row button:hover {
-            background-color: #5a6268;
+            background-color: #5F6368;
         }
 
-
-        /* MODE AND MENU SWITCHES */
+        /* SAVE BUTTON */
+        .save-button {
+            background-color: var(--success-green); 
+            margin-left: 0; 
+            margin-top: 10px; 
+            width: 100%;
+        }
+        .save-button:hover {
+            background-color: #2F8745; 
+        }
+        .button-group-row {
+            display: flex;
+            gap: 10px;
+            margin-top: 10px;
+        }
+        
+        /* MENU SWITCH BUTTONS */
         .menu-switch, .mode-switch {
             display: flex;
             justify-content: space-around;
             margin-bottom: 25px;
-            border-radius: 6px;
-            overflow: hidden;
-            background-color: #e9ecef; /* Light gray background */
+            border-bottom: 2px solid #E8EAED;
         }
         .menu-switch button, .mode-switch button {
             flex: 1;
             padding: 12px 10px;
             border: none;
             background-color: transparent;
-            color: #495057;
+            color: var(--text-medium);
             cursor: pointer;
-            transition: background-color 0.2s, color 0.2s;
+            transition: color 0.2s;
             font-weight: 500;
+            position: relative;
         }
         .menu-switch button.active, .mode-switch button.active {
-            background-color: #007bff;
-            color: white;
+            color: var(--primary-blue);
             font-weight: 600;
         }
-        .menu-switch button:not(.active):hover, .mode-switch button:not(.active):hover {
-            background-color: #dee2e6;
+        /* Active Tab Underline */
+        .menu-switch button.active::after, .mode-switch button.active::after {
+            content: '';
+            position: absolute;
+            bottom: -2px;
+            left: 0;
+            width: 100%;
+            height: 2px;
+            background-color: var(--primary-blue);
         }
 
         /* STATUS & ERROR MESSAGES */
@@ -167,21 +206,18 @@
             text-align: center;
             padding: 12px;
             margin-bottom: 20px;
-            border-radius: 6px;
+            border-radius: 4px;
             display: none;
-            font-weight: 600;
-            border: 1px solid;
+            font-weight: 500;
             transition: opacity 0.3s ease;
         }
         .status-success {
-            background-color: #d4edda;
-            color: #155724;
-            border-color: #c3e6cb;
+            background-color: #E6F4EA; 
+            color: var(--success-green);
         }
         .status-error, .error-message {
-            background-color: #f8d7da;
-            color: #721c24;
-            border-color: #f5c6cb;
+            background-color: #FCE8E6; 
+            color: var(--error-red);
         }
         .error-message {
             padding: 8px;
@@ -191,25 +227,24 @@
             display: none;
             background-color: transparent;
             border: none;
-            color: #dc3545; /* Standard danger red */
+            color: var(--error-red); 
         }
 
         /* LISTING STYLES */
         #secret_list_content {
             margin-top: 15px;
-            padding: 0 10px;
-            border: 1px solid #e9ecef;
-            border-radius: 6px;
+            padding: 0;
             max-height: 400px;
             overflow-y: auto;
-            background-color: #fff;
+            background-color: var(--surface-white);
         }
         #secret_list_content h4 {
             border-bottom: none;
             margin-top: 15px;
-            padding-bottom: 0;
-            font-size: 1.1em;
-            color: #007bff; /* Primary color for categories */
+            padding: 5px 15px 5px 0;
+            font-size: 1em;
+            color: var(--primary-blue); 
+            font-weight: 600;
         }
         #secret_list_content ul {
             list-style: none;
@@ -221,32 +256,42 @@
             justify-content: space-between; 
             align-items: center;
             padding: 12px 0;
-            border-bottom: 1px solid #eee;
+            border-bottom: 1px solid #F1F3F4;
+            transition: background-color 0.2s;
+        }
+        .secret-item:hover {
+            background-color: #F8F9FA;
         }
         .secret-item:last-child {
             border-bottom: none;
         }
+        .secret-item-info {
+            padding-left: 15px;
+        }
         .secret-item-info strong {
-            color: #333;
+            color: var(--text-dark);
             font-size: 1em;
         }
         .secret-item-info span {
             font-size: 0.85em;
-            color: #999;
+            color: var(--text-medium);
             margin-left: 10px;
             font-style: italic;
         }
         .inline-decrypt-button {
             padding: 8px 15px;
-            background-color: #28a745; /* Success green */
+            background-color: var(--success-green); 
             color: white;
             border: none;
             border-radius: 4px;
             cursor: pointer;
             font-size: 0.9em;
+            font-weight: 500;
+            margin-right: 15px;
+            box-shadow: 0 1px 2px 0 rgba(60,64,67,.3), 0 1px 3px 1px rgba(60,64,67,.15);
         }
         .inline-decrypt-button:hover {
-            background-color: #1e7e34;
+            background-color: #2F8745;
         }
         .list-utility-row {
             display: flex;
@@ -254,19 +299,23 @@
             align-items: center;
             margin-bottom: 15px;
             gap: 10px;
+            padding: 0 15px;
         }
         #search_input {
             flex-grow: 1;
             padding: 10px;
-            border: 1px solid #ccc;
-            border-radius: 6px;
+            border-radius: 20px; 
+            border: 1px solid #DADCE0;
+            background-color: #F1F3F4;
         }
 
         /* DECRYPTION DETAILS VIEW */
         #secret_details {
             margin-top: 25px;
-            border-top: 2px solid #007bff; /* Separator color */
+            border-top: 1px solid #E8EAED; 
             padding-top: 20px;
+            padding-left: 15px;
+            padding-right: 15px;
         }
         .details-viewer-header {
              display: flex; 
@@ -278,14 +327,8 @@
              border-bottom: none;
              margin-bottom: 0;
              font-weight: 600;
-             color: #007bff;
+             color: var(--primary-blue);
         }
-        .details-viewer-header span {
-            font-style: italic;
-            font-weight: normal;
-            color: #333;
-        }
-        
         .details-viewer-header button {
             padding: 8px 12px;
             border: none;
@@ -296,106 +339,73 @@
             font-weight: 500;
         }
         .details-viewer-header button.edit-button {
-            background-color: #ffc107; /* Warning yellow */
-            color: #343a40;
+            background-color: var(--primary-blue); 
+            color: white;
         }
         .details-viewer-header button.edit-button:hover {
-            background-color: #e0a800;
+            background-color: var(--primary-dark);
         }
         .details-viewer-header button.delete-button {
-            background-color: #dc3545; /* Danger red */
+            background-color: var(--error-red); 
             color: white;
         }
         .details-viewer-header button.delete-button:hover {
-            background-color: #c82333;
+            background-color: #CC0000;
         }
         .details-viewer-header #close_details_button {
-            background-color: #6c757d;
-            color: white;
+            background-color: #F1F3F4;
+            color: var(--text-dark);
+            box-shadow: none;
         }
         .details-viewer-header #close_details_button:hover {
-            background-color: #5a6268;
+            background-color: #E8EAED;
         }
 
         /* Decryption Output Styling */
         #decryption_output pre, #decryption_output div.content-box {
-            white-space: pre-wrap;
-            word-wrap: break-word;
-            background: #f8f9fa; /* Very light background for content box */
+            background: #f8f9fa; 
             padding: 15px; 
             border-radius: 8px;
-            border: 1px solid #e9ecef;
+            border: 1px solid #E8EAED;
         }
         .decrypted-field {
             margin-bottom: 10px;
             padding: 8px 0;
-            border-bottom: 1px dotted #ccc;
+            border-bottom: 1px dotted #DADCE0;
             display: flex; 
             align-items: center;
             justify-content: space-between; 
         }
-        .decrypted-field:last-child {
-            border-bottom: none;
-        }
-        .field-info {
-            display: flex;
-            align-items: baseline;
-            flex-grow: 1;
-        }
         .field-label {
             font-weight: 600;
-            color: #333;
-            width: 120px; /* Slightly wider label area */
-            min-width: 120px;
-            margin-right: 15px;
-            font-size: 0.9em;
+            color: var(--text-dark);
         }
-        .field-value {
-             font-family: monospace;
-             background-color: #fff;
-             padding: 4px 8px;
-             border-radius: 4px;
-             border: 1px solid #ddd;
-             display: inline-block;
-             max-width: 70%;
-             overflow: hidden;
-             text-overflow: ellipsis;
-             flex-grow: 1;
-             color: #333;
-             font-size: 0.9em;
-        }
+        
         button.copy-utility-button {
-            background: #e9ecef;
-            border: 1px solid #ddd;
+            background: #E8EAED;
+            border: none;
             padding: 5px 10px;
-            font-size: 0.85em;
+            font-size: 0.8em;
             border-radius: 4px;
             margin-left: 10px;
-            color: #333;
+            color: var(--text-dark);
         }
         button.copy-utility-button:hover {
-            background: #dee2e6;
-            color: #007bff;
+            background: #DADCE0;
         }
-
-        /* Strength Meter (Unchanged but ensuring colors fit) */
+        
+        /* Strength Meter */
         #password_meter {
-            height: 8px;
-            border-radius: 4px;
+            height: 4px; 
+            border-radius: 2px;
             margin-top: 5px;
-            background: #eee;
+            background: #E8EAED;
             overflow: hidden;
         }
-        .strength-text {
-            font-size: 0.85em;
-            text-align: right;
-            margin-top: 2px;
-            font-weight: 500;
-            color: #666;
-        }
-        .weak { background-color: #dc3545; }
-        .medium { background-color: #ffc107; }
-        .strong { background-color: #28a745; }
+        .weak { background-color: var(--error-red); }
+        .medium { background-color: #FBBC04; } 
+        .strong { background-color: var(--success-green); }
+        
         .password-group {
              display: flex;
              align-items: center;
@@ -405,39 +415,44 @@
 </head>
 <body>
     <div class="container">
-        <h2>Secure Vault</h2>
+        <h2>Secure Vault (Stateless Key Mode)</h2>
         
         <div id="status_message"></div>
 
         <div class="menu-switch">
-            <button type="button" id="btn_entry" class="active" onclick="switchMenu('entry')">➕ New Entry</button>
-            <button type="button" id="btn_list" onclick="switchMenu('list')">📄 List Secrets</button>
+            <button type="button" id="btn_entry" class="active" onclick="switchMenu('entry')">✨ New Entry</button>
+            <button type="button" id="btn_list" onclick="switchMenu('list')">📄 Stored Secrets</button>
         </div>
 
         <div class="form-group" id="global_keys">
-            <label for="master_password">🔐 Entry Decryption Master Password (Auto-Clears):</label>
+            <label for="master_password">🔐 Master Password:</label>
             <div class="input-utility-group">
                 <input type="password" id="master_password" name="master_password" placeholder="Enter your master key (required for encrypt/decrypt)"> 
-                <button type="button" class="utility-button" onclick="togglePasswordVisibility('master_password')" title="Show Entry Decryption Master Password">&#x1F441;</button>
+                <button type="button" class="utility-button" onclick="togglePasswordVisibility('master_password')" title="Show Entry Decryption Master Password">👁️</button>
             </div>
 
             <label for="github_token_input" style="margin-top: 15px;">👤 GitHub Personal Access Token (PAT):</label>
             <div class="input-utility-group">
                 <input type="password" id="github_token_input" name="github_token_input" placeholder="Token from config.json (or enter a temporary one)"> 
-                <button type="button" class="utility-button" onclick="togglePasswordVisibility('github_token_input')" title="Show Token">&#x1F441;</button>
+                <button type="button" class="utility-button" onclick="togglePasswordVisibility('github_token_input')" title="Show Token">👁️</button>
             </div>
             
-            <p id="key_status_hint" style="margin-top: 10px; font-size: 0.85em; color: #007bff; display: none;">
-                🔑 **First Use:** This password will also initialize your secure Master Key data.
+            <div class="button-group-row">
+                 <button type="button" class="save-button" onclick="saveCredentials()">💾 Save Credentials Locally</button>
+                 <button type="button" class="save-button" onclick="deleteCredentials()" style="background-color: var(--error-red);">🗑️ Clear Credentials</button>
+            </div>
+
+            <p id="key_status_hint" style="margin-top: 10px; font-size: 0.85em; display: block; color: var(--success-green);">
+                ✅ Stateless Key Mode: Keys are derived on-the-fly using a unique, per-entry salt stored in the GitHub file.
             </p>
         </div>
         
-        <hr style="border: 0; border-top: 1px solid #eee; margin: 30px 0;">
+        <hr style="border: 0; border-top: 1px solid #E8EAED; margin: 30px 0;">
 
         <div id="form_view">
             <h3>New Secure Entry</h3>
             <div class="mode-switch">
-                <button type="button" id="btn_website" class="active" onclick="switchMode('website')">🌐 Website/Login</button>
+                <button type="button" id="btn_website" class="active" onclick="switchMode('website')">🌐 Login/Website</button>
                 <button type="button" id="btn_text" onclick="switchMode('text')">📝 Secure Note</button>
             </div>
 
@@ -451,7 +466,7 @@
                         <label for="username">Username/Email (Login):</label>
                         <div class="input-utility-group">
                             <input type="text" id="username" name="username" placeholder="Enter your username or email" required>
-                            <button type="button" class="utility-button" onclick="copyToClipboard('username')" title="Copy Username">&#x2398;</button>
+                            <button type="button" class="utility-button" onclick="copyToClipboard('username')" title="Copy Username">📋</button>
                         </div>
                     </div>
                 </div>
@@ -465,7 +480,7 @@
                         <label for="content">Content/Note:</label>
                         <div class="input-utility-group">
                             <textarea id="content" name="content" placeholder="Enter your secret text or note" required disabled></textarea>
-                             <button type="button" class="utility-button" onclick="copyToClipboard('content')" title="Copy Note Content">&#x2398;</button>
+                            <button type="button" class="utility-button" onclick="copyToClipboard('content')" title="Copy Note Content">📋</button>
                         </div>
                     </div>
                 </div>
@@ -475,8 +490,8 @@
                     <div class="password-group">
                         <div class="input-utility-group" style="flex-grow: 1;">
                             <input type="password" id="password" name="password" placeholder="Enter or generate a password" onkeyup="checkPasswordStrength()" required>
-                            <button type="button" class="utility-button" onclick="togglePasswordVisibility('password')" title="Show Password">&#x1F441;</button>
-                            <button type="button" class="utility-button" onclick="copyToClipboard('password')" title="Copy Password">&#x2398;</button>
+                            <button type="button" class="utility-button" onclick="togglePasswordVisibility('password')" title="Show Password">👁️</button>
+                            <button type="button" class="utility-button" onclick="copyToClipboard('password')" title="Copy Password">📋</button>
                         </div>
                         <button type="button" onclick="generatePassphrase()" title="Generate random passphrase">Words</button> 
                         <button type="button" onclick="generatePassword()" title="Generate random mixed-character password">Gen</button>
@@ -492,12 +507,12 @@
                     <label for="confirm_password">Confirm Stored Password:</label>
                     <div class="input-utility-group">
                         <input type="password" id="confirm_password" name="confirm_password" placeholder="Re-enter your password" required>
-                        <button type="button" class="utility-button" onclick="togglePasswordVisibility('confirm_password')" title="Show Confirmation Password">&#x1F441;</button>
+                        <button type="button" class="utility-button" onclick="togglePasswordVisibility('confirm_password')" title="Show Confirmation Password">👁️</button>
                     </div>
                     <p id="password_error" class="error-message">Passwords do not match!</p>
                 </div>
 
-                <button type="submit">Encrypt & Send to GitHub Action</button>
+                <button type="submit">🔒 Encrypt & Send</button>
             </form>
         </div>
 
@@ -506,21 +521,20 @@
             
             <div class="list-utility-row">
                 <input type="text" id="search_input" placeholder="Filter secrets by name..." onkeyup="filterSecretList()">
-                <button type="button" onclick="refreshSecretList()">🔄 Refresh List</button>
+                <button type="button" onclick="refreshSecretList()">🔄 Refresh</button>
             </div>
 
             <div id="secret_list_content">
-                <p>Click "Refresh List" to load secrets from your GitHub repository.</p>
+                <p style="padding-left: 15px;">Click "Refresh" to load secrets from your GitHub repository.</p>
             </div>
             
             <div id="secret_details" style="display: none;">
                 <div class="details-viewer-header">
                     <h4>Decrypted Details for: <span id="selected_secret_name"></span></h4>
                     <div>
-                        <button id="delete_button" class="delete-button" style="display:none;" title="Permanently archive this entry" onclick="deleteSecret()">🗑️ Archive Secret</button>
-                        
-                        <button id="edit_button" class="edit-button" style="display:none;" title="Edit/Re-encrypt this entry">✏️ Edit/Re-encrypt</button>
-                        <button id="close_details_button" onclick="document.getElementById('secret_details').style.display='none'">Close Viewer</button>
+                        <button id="delete_button" class="delete-button" style="display:none;" title="Permanently archive this entry" onclick="deleteSecret()">🗑️ Archive</button>
+                        <button id="edit_button" class="edit-button" style="display:none;" title="Edit/Re-encrypt this entry">✏️ Edit</button>
+                        <button id="close_details_button" onclick="document.getElementById('secret_details').style.display='none'">Close</button>
                     </div>
                 </div>
                 <div id="decryption_output" style="margin-top: 10px;">
@@ -534,60 +548,9 @@
         // --- Configuration Object ---
         let config = null;
         const DIC = ["apple", "river", "cloud", "snake", "ocean", "pizza", "happy", "zebra", "music", "light", "house", "chair", "table", "phone", "plant", "green", "tiger", "earth", "dream", "robot", "magic", "ghost", "knife", "spoon", "sugar", "heart", "moon", "star", "jelly", "socks"];
-        let inactivityTimer;
         
-        // ** DYNAMIC TIMEOUT BASED ON CONFIGURATION **
-        let INACTIVITY_TIMEOUT_MS = 5 * 60 * 1000; // Default to 5 minutes before config load
-
         // --- GLOBAL STATE FOR CURRENTLY DECRYPTED SECRET ---
         window.currentSecretPath = null; 
-
-        // --- Master Password Timeout Logic ---
-        
-        /**
-         * Clears the Master Password field and provides a status message.
-         */
-        function clearMasterPassword() {
-            const masterInput = document.getElementById('master_password');
-            if (masterInput && masterInput.value.length > 0) {
-                // 1. Securely overwrite the field value
-                masterInput.value = '';
-                
-                // 2. Ensure the type is correctly set to 'password'
-                masterInput.type = 'password'; 
-                
-                // 3. Set a status message
-                setStatus('Entry Decryption Master Password cleared due to inactivity/tab switch.', true);
-            }
-            if (inactivityTimer) {
-                clearTimeout(inactivityTimer);
-                inactivityTimer = null; // Mark as cleared
-            }
-        }
-        
-        /**
-         * Starts or resets the inactivity timer.
-         */
-        function resetMasterPasswordTimer() {
-            const masterInput = document.getElementById('master_password');
-            
-            // If the field is currently empty, don't start the timer.
-            if (masterInput && masterInput.value.length === 0) {
-                 if (inactivityTimer) {
-                     clearTimeout(inactivityTimer);
-                     inactivityTimer = null;
-                 }
-                 return;
-            }
-
-            // Clear any running timer first
-            if (inactivityTimer) {
-                clearTimeout(inactivityTimer);
-            }
-            
-            // Start the new timer using the dynamically set duration
-            inactivityTimer = setTimeout(clearMasterPassword, INACTIVITY_TIMEOUT_MS);
-        }
 
         // --- Configuration Loader ---
         async function loadConfig() {
@@ -596,27 +559,22 @@
                 if (!response.ok) throw new Error(`HTTP error! Status: ${response.status}`);
                 config = await response.json();
                 
-                // Set the DYNAMIC TIMEOUT here using the loaded config
-                const timeoutMinutes = config.crypto_config.master_key_timeout_minutes;
-                if (typeof timeoutMinutes === 'number' && timeoutMinutes > 0) {
-                    INACTIVITY_TIMEOUT_MS = timeoutMinutes * 60 * 1000;
-                    console.log(`Master Password timeout set to ${timeoutMinutes} minutes (from config.json).`);
-                } else {
-                    INACTIVITY_TIMEOUT_MS = 10 * 60 * 1000; // Default to 10 minutes if config is missing or invalid
-                    console.warn(`Master Password timeout config missing or invalid. Defaulting to 10 minutes.`);
-                }
-
-                // Populate the GitHub Token input field's placeholder with the loaded config value
+                // === LOGIC FOR FILLING TOKEN FROM CONFIG ===
                 const tokenInput = document.getElementById('github_token_input');
-                if (config.github_config && config.github_config.token && config.github_config.token !== 'YOUR_PERSONAL_ACCESS_TOKEN') {
-                    // Do NOT use placeholder if the token is present (security). Instead, set value.
-                    // NOTE: Setting value here is acceptable for convenience but poses a minor risk. 
-                    // For maximum security, this line should be REMOVED, forcing the user to paste the token every session.
-                    tokenInput.placeholder = 'Loaded from config.json (Length: ' + config.github_config.token.length + ')';
+                const ghConfig = config.github_config;
+
+                if (ghConfig && ghConfig.token && ghConfig.token !== 'YOUR_PERSONAL_ACCESS_TOKEN') {
+                    tokenInput.value = ghConfig.token;
+                    tokenInput.placeholder = 'Token loaded from config.json'; 
+                    setStatus("GitHub Token loaded automatically from config.json.", false);
+                } else {
+                    tokenInput.placeholder = 'Token from config.json (or enter a temporary one)'; 
                 }
+                // === END LOGIC ===
+
             } catch (error) {
                 console.error("Failed to load config.json:", error);
-                setStatus("FATAL ERROR: Could not load config.json. Check file path and network. (Required new fields: hmac_algo_name, hmac_hash_algo, delete_workflow_name, master_key_timeout_minutes)", true);
+                setStatus("FATAL ERROR: Could not load config.json. Check file path and network.", true);
                 throw error; 
             }
         }
@@ -630,30 +588,150 @@
             setTimeout(() => { statusDiv.style.display = 'none'; }, 8000);
         }
 
-        // --- IndexedDB Setup (Master Key) ---
-        function openDB() {
-            if (!config) throw new Error("Configuration not loaded yet.");
-            const C = config.crypto_config;
+        // --- IndexedDB for Credential Storage ---
+        const DB_NAME = 'SecureVaultCreds';
+        const STORE_NAME = 'credentials';
+        const CRED_KEY = 'saved_auth';
+
+        function openCredsDB() {
             return new Promise((resolve, reject) => {
-                const request = indexedDB.open(C.db_name, C.db_version); 
+                const request = indexedDB.open(DB_NAME, 1);
+                
                 request.onupgradeneeded = (event) => {
                     const db = event.target.result;
-                    if (!db.objectStoreNames.contains(C.store_name)) {
-                        db.createObjectStore(C.store_name, { keyPath: 'id' });
+                    if (!db.objectStoreNames.contains(STORE_NAME)) {
+                        db.createObjectStore(STORE_NAME);
                     }
                 };
-                request.onsuccess = (event) => resolve(event.target.result);
+
+                request.onsuccess = (event) => {
+                    resolve(event.target.result);
+                };
+
                 request.onerror = (event) => {
-                    setStatus('IndexedDB error (Master Key Store): ' + event.target.errorCode, true);
-                    reject('IndexedDB error: ' + event.target.errorCode);
+                    reject(new Error(`IndexedDB error: ${event.target.errorCode}`));
                 };
             });
         }
-        
-        // --- Cryptography Functions ---
 
+        async function saveCreds(masterPassword, githubToken) {
+            try {
+                const db = await openCredsDB();
+                const tx = db.transaction(STORE_NAME, 'readwrite');
+                const store = tx.objectStore(STORE_NAME);
+                
+                const data = { 
+                    masterPassword: masterPassword, 
+                    githubToken: githubToken,
+                    savedAt: new Date().toISOString()
+                };
+                
+                return new Promise((resolve, reject) => {
+                    const request = store.put(data, CRED_KEY);
+                    request.onsuccess = () => resolve();
+                    request.onerror = () => reject(new Error('Failed to save credentials.'));
+                });
+                
+            } catch (error) {
+                console.error("Save Creds Error:", error);
+                throw error;
+            }
+        }
+
+        async function getCreds() {
+             try {
+                const db = await openCredsDB();
+                const tx = db.transaction(STORE_NAME, 'readonly');
+                const store = tx.objectStore(STORE_NAME);
+                
+                return new Promise((resolve, reject) => {
+                    const request = store.get(CRED_KEY);
+                    request.onsuccess = () => resolve(request.result);
+                    request.onerror = () => reject(new Error('Failed to retrieve credentials.'));
+                });
+                
+            } catch (error) {
+                return null;
+            }
+        }
+
+        async function deleteCreds() {
+            try {
+                const db = await openCredsDB();
+                const tx = db.transaction(STORE_NAME, 'readwrite');
+                const store = tx.objectStore(STORE_NAME);
+                
+                return new Promise((resolve, reject) => {
+                    const request = store.delete(CRED_KEY);
+                    request.onsuccess = () => resolve();
+                    request.onerror = () => reject(new Error('Failed to delete credentials.'));
+                });
+                
+            } catch (error) {
+                 console.error("Delete Creds Error:", error);
+                 throw error;
+            }
+        }
+        
+        async function loadStoredCredentials() {
+            const creds = await getCreds();
+            if (creds && creds.masterPassword && creds.githubToken) {
+                 document.getElementById('master_password').value = creds.masterPassword;
+                 document.getElementById('github_token_input').value = creds.githubToken; 
+                 setStatus("Credentials loaded automatically from local storage.", false);
+            } else if (creds) {
+                 await deleteCreds();
+            }
+        }
+
+        // --- UI Callbacks for Credential Management ---
+
+        async function saveCredentials() {
+            const masterPassword = document.getElementById("master_password").value;
+            const githubToken = document.getElementById("github_token_input").value;
+
+            if (masterPassword.length < 8) {
+                 setStatus("Master Password must be at least 8 characters long to save.", true);
+                 return;
+            }
+            if (githubToken.length === 0 || githubToken === 'YOUR_PERSONAL_ACCESS_TOKEN') {
+                 setStatus("GitHub Token must be entered to save.", true);
+                 return;
+            }
+
+            try {
+                 await saveCreds(masterPassword, githubToken);
+                 setStatus("✅ Master Password and GitHub Token saved securely to local browser storage.", false);
+            } catch (error) {
+                 setStatus(`Error saving credentials: ${error.message}`, true);
+            }
+        }
+        
+        async function deleteCredentials() {
+            const confirmDelete = confirm("Are you sure you want to permanently clear the saved credentials from your browser?");
+            if (!confirmDelete) return;
+
+            try {
+                 await deleteCreds();
+                 document.getElementById('master_password').value = '';
+                 document.getElementById('github_token_input').value = '';
+                 setStatus("🗑️ Saved credentials have been cleared from local browser storage.", false);
+            } catch (error) {
+                 setStatus(`Error deleting credentials: ${error.message}`, true);
+            }
+        }
+
+        // --- Cryptography Functions (UPDATED FOR STATELESS) ---
+
+        /**
+         * Stateless key derivation: derives keys using Master Password and a unique per-entry salt.
+         * @param {string} masterPassword - The user's master key.
+         * @param {Uint8Array} salt - A unique salt for the entry (must be stored with the entry data).
+         * @returns {Promise<{cipherKey: CryptoKey, hmacKey: CryptoKey}>}
+         */
         async function deriveKeys(masterPassword, salt) {
             const C = config.crypto_config;
+            
             const masterKey = await window.crypto.subtle.importKey(
                 "raw", new TextEncoder().encode(masterPassword), { name: "PBKDF2" }, false, ["deriveKey", "deriveBits"]
             );
@@ -661,7 +739,7 @@
             const derivedBits = await window.crypto.subtle.deriveBits(
                 {
                     name: "PBKDF2",
-                    salt: salt,
+                    salt: salt, // Uses the per-entry salt
                     iterations: C.pbkdf2_iterations,
                     hash: C.pbkdf2_hash_algo,
                 },
@@ -684,20 +762,30 @@
             
             return { cipherKey, hmacKey };
         }
-
-        async function encryptData(cipherKey, hmacKey, data) {
+        
+        /**
+         * Encrypts data using a newly generated salt and returns the package including salt.
+         * @param {string} masterPassword - The user's master key.
+         * @param {string} data - The JSON string data to encrypt.
+         * @returns {Promise<{ciphertext: number[], iv: number[], tag: number[], salt: number[]}>}
+         */
+        async function encryptData(masterPassword, data) {
             const C = config.crypto_config;
             const encodedData = new TextEncoder().encode(data);
             const iv = window.crypto.getRandomValues(new Uint8Array(12)); 
+            const salt = window.crypto.getRandomValues(new Uint8Array(16)); // NEW: Generate per-entry salt
             
-            // 1. Encrypt
+            // 1. Derive keys using the new salt
+            const { cipherKey, hmacKey } = await deriveKeys(masterPassword, salt);
+
+            // 2. Encrypt
             const ciphertext = await window.crypto.subtle.encrypt(
                 { name: C.key_algo_name, iv: iv }, 
                 cipherKey,
                 encodedData
             );
             
-            // 2. Sign (HMAC) the ciphertext
+            // 3. Sign
             const signature = await window.crypto.subtle.sign(
                 { name: C.hmac_algo_name },
                 hmacKey,
@@ -707,15 +795,24 @@
             return {
                 ciphertext: Array.from(new Uint8Array(ciphertext)),
                 iv: Array.from(iv),
-                tag: Array.from(new Uint8Array(signature)) 
+                tag: Array.from(new Uint8Array(signature)),
+                salt: Array.from(salt) // NEW: Include salt in the package
             };
         }
 
+        /**
+         * Decrypts data using derived keys.
+         * @param {CryptoKey} cipherKey - The derived cipher key.
+         * @param {CryptoKey} hmacKey - The derived HMAC key.
+         * @param {number[]} iv - Initialization vector.
+         * @param {number[]} ciphertext - Encrypted data.
+         * @param {number[]} tag - HMAC signature.
+         * @returns {Promise<string>}
+         */
         async function decryptData(cipherKey, hmacKey, iv, ciphertext, tag) {
             const C = config.crypto_config;
             const ciphertextArray = new Uint8Array(ciphertext);
             
-            // 1. Check for integrity tag
             if (!tag) {
                  console.warn("Legacy file detected: HMAC tag missing. Decryption proceeding without integrity check.");
             } else {
@@ -732,7 +829,6 @@
                  }
             }
             
-            // 2. Decrypt
             const decrypted = await window.crypto.subtle.decrypt(
                 { name: C.key_algo_name, iv: new Uint8Array(iv) },
                 cipherKey,
@@ -740,65 +836,6 @@
             );
             
             return new TextDecoder().decode(decrypted);
-        }
-        
-        // --- Master Key Storage and Utility Functions ---
-
-        /**
-         * Saves the initial salt for key derivation. Used only on first submission.
-         * @param {string} masterPassword - The user's entry decryption password (used as key for saving the salt).
-         */
-        async function saveMasterKeyData(masterPassword) {
-            if (!config) throw new Error("Configuration not loaded.");
-            const C = config.crypto_config;
-            const existingKeyData = await getMasterKeyData();
-            if (existingKeyData) return existingKeyData; 
-
-            try {
-                // Generate a fresh, random salt
-                const salt = window.crypto.getRandomValues(new Uint8Array(16)); 
-                
-                const db = await openDB();
-                const transaction = db.transaction(C.store_name, 'readwrite');
-                const store = transaction.objectStore(C.store_name);
-                
-                const keyData = {
-                    id: C.key_id,
-                    exportedKey: { type: "raw" }, 
-                    salt: Array.from(salt), 
-                    iterations: C.pbkdf2_iterations
-                };
-                
-                await new Promise((resolve, reject) => {
-                    const request = store.put(keyData);
-                    request.onsuccess = () => resolve();
-                    request.onerror = (event) => reject(event.target.error);
-                });
-                
-                setStatus('Master Key data (Salt) saved securely for future encryptions.', false);
-                return keyData;
-
-            } catch (error) {
-                console.error("Cryptography or DB operation failed:", error);
-                setStatus("An error occurred during secure key generation.", true);
-                throw error;
-            }
-        }
-        
-        function getMasterKeyData() {
-            if (!config) throw new Error("Configuration not loaded.");
-            const C = config.crypto_config;
-            return new Promise(async (resolve, reject) => {
-                try {
-                    const db = await openDB();
-                    const store = db.transaction(C.store_name, 'readonly').objectStore(C.store_name);
-                    const request = store.get(C.key_id);
-                    request.onsuccess = () => resolve(request.result);
-                    request.onerror = (event) => reject(event.target.error);
-                } catch (error) {
-                    reject(error);
-                }
-            });
         }
         
         function getSafeMetadata() {
@@ -841,11 +878,11 @@
             
             const ghConfig = config.github_config;
 
-            // Determine which token to use
-            const token = tokenInput || ghConfig.token;
+            const token = tokenInput;
 
+            // Final configuration validation before API call
             if (!ghConfig.repository || !ghConfig.workflow_name || !token || token === 'YOUR_PERSONAL_ACCESS_TOKEN') {
-                 setStatus("Configuration Error: GitHub repository, workflow_name, or token is missing/default.", true);
+                 setStatus("Configuration Error: GitHub repository, workflow_name, or token is missing/default. **Check GitHub Token field.**", true);
                  return;
             }
 
@@ -855,7 +892,7 @@
                 return;
             }
             if (masterPassword.length === 0) {
-                 setStatus("Error: Entry Decryption Master Password is required to encrypt the entry.", true);
+                 setStatus("Error: Master Password is required to encrypt the entry.", true);
                  document.getElementById("master_password").focus();
                  return;
             }
@@ -863,16 +900,6 @@
             document.getElementById("password_error").style.display = "none";
 
             try {
-                let keyData = await getMasterKeyData();
-                
-                // AUTOMATIC MASTER KEY INITIALIZATION
-                if (!keyData) {
-                    setStatus("First use detected. Initializing secure Master Key data...", false);
-                    keyData = await saveMasterKeyData(masterPassword); 
-                }
-                
-                const { cipherKey, hmacKey } = await deriveKeys(masterPassword, new Uint8Array(keyData.salt));
-
                 let entryName = '';
                 let dataToEncrypt = {};
                 
@@ -891,7 +918,9 @@
                 dataToEncrypt.metadata = getSafeMetadata(); 
 
                 const jsonData = JSON.stringify(dataToEncrypt);
-                const encryptedPackage = await encryptData(cipherKey, hmacKey, jsonData);
+                
+                // NEW: encryptData now handles key derivation and salt generation
+                const encryptedPackage = await encryptData(masterPassword, jsonData);
 
                 const [owner, repo] = ghConfig.repository.split('/'); 
                 const workflowId = ghConfig.workflow_name; 
@@ -906,7 +935,8 @@
                         encrypted_data: JSON.stringify({
                             ciphertext: encryptedPackage.ciphertext,
                             iv: encryptedPackage.iv,
-                            tag: encryptedPackage.tag 
+                            tag: encryptedPackage.tag,
+                            salt: encryptedPackage.salt // NEW: Send the unique salt
                         })
                     }
                 });
@@ -926,8 +956,6 @@
                 if (response.status === 204) {
                     setStatus(`Entry successfully encrypted and sent. GitHub Workflow Dispatch triggered.`, false);
                     event.target.reset(); 
-                    checkKeyStatusAndUpdateUI(); 
-                    clearMasterPassword(); 
                 } else {
                     const errorText = await response.json().catch(() => response.text());
                     throw new Error(`GitHub API call failed. Status: ${response.status}. Message: ${JSON.stringify(errorText)}`);
@@ -940,7 +968,7 @@
         }
 
 
-        // --- LISTING FUNCTIONS ---
+        // --- LISTING & UI UTILITIES ---
 
         function switchMenu(menu) {
             document.getElementById('form_view').style.display = menu === 'entry' ? 'block' : 'none';
@@ -954,9 +982,6 @@
             }
         }
         
-        /**
-         * Filters the secret list items based on the search input value.
-         */
         function filterSecretList() {
             const searchInput = document.getElementById('search_input').value.toLowerCase();
             const listItems = document.querySelectorAll('#secret_list_content .secret-item');
@@ -973,34 +998,26 @@
             });
         }
         
-        // Function to populate the form fields for editing 
         function populateEntryForm(data) {
-            // 1. Switch to Entry View
             switchMenu('entry');
             
-            // 2. Clear password fields
             document.getElementById('password').value = '';
             document.getElementById('confirm_password').value = '';
             checkPasswordStrength('');
             
-            // 3. Populate fields based on type
             if (data.website) {
-                // Website Mode
                 switchMode('website');
                 document.getElementById('website').value = data.website;
                 document.getElementById('username').value = data.username || '';
             } else if (data.content) {
-                // Text Mode
                 switchMode('text');
                 document.getElementById('name').value = data.name || '';
                 document.getElementById('content').value = data.content || '';
             }
             
-            // Populate common fields 
             document.getElementById('password').value = data.password || ''; 
             document.getElementById('confirm_password').value = data.password || ''; 
             
-            // 4. Update password strength display
             checkPasswordStrength(document.getElementById('password').value);
             
             setStatus("Entry loaded into form. Make your edits and click 'Encrypt & Send' to overwrite.", false);
@@ -1014,7 +1031,7 @@
             const ghConfig = config.github_config;
             const [owner, repo] = ghConfig.repository.split('/'); 
             const listContentDiv = document.getElementById('secret_list_content');
-            listContentDiv.innerHTML = '<p>Loading secrets...</p>';
+            listContentDiv.innerHTML = '<p style="padding-left: 15px;">Loading secrets...</p>';
             setStatus('Fetching list of stored secrets...', false);
             
             document.getElementById('secret_details').style.display = 'none';
@@ -1022,10 +1039,10 @@
             document.getElementById('search_input').value = ''; 
 
             const tokenInput = document.getElementById('github_token_input').value.trim();
-            const token = tokenInput || ghConfig.token;
+            const token = tokenInput; 
 
             if (!token || token === 'YOUR_PERSONAL_ACCESS_TOKEN') {
-                listContentDiv.innerHTML = '<p class="error-message" style="display:block;">Cannot load list: Please enter or verify your GitHub Token above.</p>';
+                listContentDiv.innerHTML = '<p class="error-message" style="display:block; padding-left: 15px;">Cannot load list: Please enter or verify your **GitHub Token** above.</p>';
                 setStatus("Listing failed: GitHub token is missing.", true);
                 return;
             }
@@ -1042,7 +1059,7 @@
                 });
 
                 if (response.status === 404) {
-                    listContentDiv.innerHTML = '<p>The "secrets" directory does not exist yet. Please add an entry first.</p>';
+                    listContentDiv.innerHTML = '<p style="padding-left: 15px;">The "secrets" directory does not exist yet. Please add an entry first.</p>';
                     setStatus('No secrets directory found.', false);
                     return;
                 }
@@ -1055,11 +1072,10 @@
                 const contents = await response.json();
                 
                 let listHTML = '';
-                // Filter for directories (categories) inside the 'secrets' folder
                 const secretCategories = contents.filter(item => item.type === 'dir' && item.name !== 'secrets_trash');
 
                 if (secretCategories.length === 0) {
-                    listHTML = '<p>No active secret categories found.</p>';
+                    listHTML = '<p style="padding-left: 15px;">No active secret categories found.</p>';
                 } else {
                     for (const category of secretCategories) {
                         listHTML += `<h4>📁 ${category.name.toUpperCase()}</h4><ul>`;
@@ -1093,7 +1109,7 @@
                                         </div>
                                         <button class="inline-decrypt-button" 
                                                 onclick="decryptSecretFromList('${file.url}', '${fileName}', '${fullPath}')">
-                                            🔓 Decrypt
+                                            🔓 View
                                         </button>
                                     </li>`;
                             });
@@ -1107,12 +1123,11 @@
                 
             } catch (error) {
                 console.error("Error fetching secret list:", error);
-                listContentDiv.innerHTML = '<p class="error-message" style="display:block;">Error loading secrets. Check your token permissions (need **repo** or **contents** scope).</p>';
+                listContentDiv.innerHTML = '<p class="error-message" style="display:block; padding-left: 15px;">Error loading secrets. Check your token permissions (need **repo** or **contents** scope).</p>';
                 setStatus(`Error listing secrets: ${error.message}`, true);
             }
         }
 
-        // --- DELETION/ARCHIVING FUNCTION ---
         async function deleteSecret() {
             if (!window.currentSecretPath) {
                 alert("Error: No secret is currently selected for archiving.");
@@ -1131,7 +1146,7 @@
             const workflowId = ghConfig.delete_workflow_name; 
 
             const tokenInput = document.getElementById('github_token_input').value.trim();
-            const token = tokenInput || ghConfig.token;
+            const token = tokenInput; 
 
             if (!workflowId || workflowId === 'YOUR_DELETE_WORKFLOW_NAME') {
                  setStatus("Configuration Error: delete_workflow_name field in config.json must be set (e.g., delete.yml).", true);
@@ -1202,7 +1217,7 @@
              }
              
              const tokenInput = document.getElementById('github_token_input').value.trim();
-             const token = tokenInput || ghConfig.token;
+             const token = tokenInput; 
              
              if (!token || token === 'YOUR_PERSONAL_ACCESS_TOKEN') {
                  decryptionOutput.innerHTML = '<p class="error-message" style="display:block;">GitHub Token is required to fetch the encrypted file.</p>';
@@ -1232,16 +1247,16 @@
                 if (!encryptedPackage.iv || !encryptedPackage.ciphertext) {
                      throw new Error("Encrypted data structure is incomplete (missing IV or Ciphertext). File corrupted.");
                 }
-
-                // 2. Prepare the Decryption Keys
-                const keyData = await getMasterKeyData();
-                 if (!keyData) {
-                    throw new Error("Local Master Key data is not initialized. Cannot decrypt. Please run one encryption first.");
-                 }
+                
+                // NEW: Check for salt (required for new stateless files)
+                if (!encryptedPackage.salt) {
+                     throw new Error("Missing 'salt' in file. File was encrypted in a previous, incompatible version.");
+                }
+                
+                // 2. Derive the Decryption Keys using the salt from the file
+                const { cipherKey, hmacKey } = await deriveKeys(masterPassword, new Uint8Array(encryptedPackage.salt)); 
                  
-                const { cipherKey, hmacKey } = await deriveKeys(masterPassword, new Uint8Array(keyData.salt));
-                 
-                // 3. Decrypt the data (Verification happens inside decryptData)
+                // 3. Decrypt the data
                 const decryptedJsonString = await decryptData(
                     cipherKey, 
                     hmacKey, 
@@ -1285,13 +1300,11 @@
                 }
 
 
-                // Check for website/login fields
                 if (decryptedDataObject.website) {
                     appendDecryptedField('Website', decryptedDataObject.website);
                     appendDecryptedField('Login/User', decryptedDataObject.username || '[N/A]');
                     appendDecryptedField('Password', decryptedDataObject.password);
                 } 
-                // Check for text content/note fields
                 else if (decryptedDataObject.content) {
                     appendDecryptedField('Title', decryptedDataObject.name || '[N/A]');
                     appendDecryptedField('Password', decryptedDataObject.password);
@@ -1328,7 +1341,6 @@
                     `;
                 }
                 
-                // Display Last Changed Timestamp
                 const changedTimestamp = decryptedDataObject.last_changed;
                 if (changedTimestamp) {
                      let displayValue = changedTimestamp;
@@ -1352,7 +1364,7 @@
                 if (decryptedDataObject.metadata) {
                     contentBox.innerHTML += `
                         <details style="margin-top: 15px;">
-                            <summary style="font-size: 0.9em; font-weight: 500; color: #6c757d; cursor: pointer;">Metadata</summary>
+                            <summary style="font-size: 0.9em; font-weight: 500; color: var(--text-medium); cursor: pointer;">Metadata</summary>
                             <p style="font-size: 0.8em; margin: 5px 0 0 10px; color: #999;">
                                 Saved: ${decryptedDataObject.metadata.saveTime}<br>
                                 Browser: ${decryptedDataObject.metadata.browser}<br>
@@ -1367,23 +1379,18 @@
                 
                 setStatus(`Decryption successful for "${entryName}".`, false);
                 
-                // Show and assign the edit function on successful decryption
                 editButton.style.display = 'inline-block';
                 editButton.onclick = () => populateEntryForm(decryptedDataObject);
 
-                // Show the delete button on successful decryption
                 deleteButton.style.display = 'inline-block';
-
-                // Start timer after successful decryption
-                resetMasterPasswordTimer(); 
                  
              } catch (error) {
                  console.error("Decryption failed:", error);
                  let errorMessage = error.message;
                  if (errorMessage.includes("Authentication failed")) {
-                    errorMessage = "Decryption failed! The **Entry Decryption Master Password** is incorrect or the data is corrupted.";
-                 } else if (errorMessage.includes("HMAC tag missing")) {
-                     errorMessage = "Decryption failed! This file is an older format and is missing the integrity tag. Please re-encrypt this entry or create a new one.";
+                    errorMessage = "Decryption failed! The **Master Password** is incorrect or the data is corrupted.";
+                 } else if (errorMessage.includes("Missing 'salt'")) {
+                     errorMessage = "Decryption failed! This file is from an old, incompatible version. Please re-encrypt it or create a new entry.";
                  } else if (errorMessage.includes("Failed to fetch file content")) {
                     errorMessage = `Failed to fetch file: Check your GitHub Token permissions or if the file exists.`;
                  }
@@ -1393,71 +1400,8 @@
         }
         // --- END DECRYPTION FUNCTION ---
 
-        // --- COPY HELPER FUNCTIONS (UNCHANGED) ---
-        
-        async function copyStringValue(value, buttonElement) {
-            try {
-                await navigator.clipboard.writeText(value);
-                
-                const originalText = buttonElement.innerHTML;
-                buttonElement.innerHTML = '✅ Copied!';
-                setTimeout(() => { buttonElement.innerHTML = originalText; }, 1500);
-
-            } catch (err) {
-                console.error('Failed to copy: ', err);
-                alert('Could not copy to clipboard. Ensure your browser grants clipboard access.');
-            }
-        }
-
-        function createCopyButton(value) {
-            const button = document.createElement('button');
-            button.className = 'copy-utility-button';
-            button.innerHTML = '📋 Copy';
-            button.title = 'Copy value to clipboard';
-            button.onclick = (e) => {
-                e.stopPropagation(); 
-                copyStringValue(value, button);
-            };
-            return button;
-        }
-
-        function copyToClipboard(inputId) { 
-            const input = document.getElementById(inputId);
-            input.select();
-            input.setSelectionRange(0, 99999); 
-            navigator.clipboard.writeText(input.value)
-                .then(() => {
-                    alert(`Copied ${input.tagName === 'TEXTAREA' ? 'Content' : inputId.replace('_', ' ')} to clipboard!`);
-                })
-                .catch(err => {
-                    console.error('Failed to copy: ', err);
-                    alert('Could not copy to clipboard. Please try manually.');
-                });
-        }
-
         // --- UI Initialization and Utility Functions (REST UNCHANGED) ---
         
-        async function checkKeyStatusAndUpdateUI() {
-            if (!config) return; 
-            
-            const keyStatusHint = document.getElementById('key_status_hint');
-            const masterInput = document.getElementById('master_password');
-            
-            try {
-                const keyData = await getMasterKeyData();
-                if (keyData) {
-                    // Key is set up
-                    keyStatusHint.style.display = 'none';
-                    masterInput.focus(); 
-                } else {
-                    // Key is NOT set up - show the helpful hint
-                    keyStatusHint.style.display = 'block';
-                    masterInput.focus();
-                }
-            } catch (error) {
-                console.error("Failed to check key status:", error);
-            }
-        }
 
         function generatePassphrase() { 
             const numWords = Math.floor(Math.random() * 3) + 3; 
@@ -1503,11 +1447,11 @@
             const button = input.parentElement.querySelector(`button[onclick*="${inputId}"]`);
             if (input.type === "password") {
                 input.type = "text";
-                button.innerHTML = '&#x1F576;';
+                button.innerHTML = '👓';
                 button.title = "Hide Password";
             } else {
                 input.type = "password";
-                button.innerHTML = '&#x1F441;';
+                button.innerHTML = '👁️';
                 button.title = "Show Password";
             }
         }
@@ -1554,34 +1498,62 @@
             const metrics = getStrengthMetrics(password);
             
             bar.style.width = metrics.percent + '%';
-            bar.className = metrics.color; // Use CSS classes for color
+            bar.className = metrics.color; 
             strengthDisplay.textContent = metrics.text;
+        }
+        
+        async function copyStringValue(value, buttonElement) {
+            try {
+                await navigator.clipboard.writeText(value);
+                
+                const originalText = buttonElement.innerHTML;
+                buttonElement.innerHTML = '✔️ Copied!';
+                setTimeout(() => { buttonElement.innerHTML = originalText; }, 1500);
+
+            } catch (err) {
+                console.error('Failed to copy: ', err);
+                alert('Could not copy to clipboard. Ensure your browser grants clipboard access.');
+            }
+        }
+
+        function createCopyButton(value) {
+            const button = document.createElement('button');
+            button.className = 'copy-utility-button';
+            button.innerHTML = '📋 Copy';
+            button.title = 'Copy value to clipboard';
+            button.onclick = (e) => {
+                e.stopPropagation(); 
+                copyStringValue(value, button);
+            };
+            return button;
+        }
+
+        function copyToClipboard(inputId) { 
+            const input = document.getElementById(inputId);
+            input.select();
+            input.setSelectionRange(0, 99999); 
+            navigator.clipboard.writeText(input.value)
+                .then(() => {
+                    alert(`Copied ${input.tagName === 'TEXTAREA' ? 'Content' : inputId.replace('_', ' ')} to clipboard!`);
+                })
+                .catch(err => {
+                    console.error('Failed to copy: ', err);
+                    alert('Could not copy to clipboard. Please try manually.');
+                });
         }
 
         window.onload = async function() {
+            // 1. Load configuration (and automatically fill token if present in config.json)
             await loadConfig();
+            
             if (config) {
+                // 2. Load locally stored credentials (and overwrite token if saved locally)
+                await loadStoredCredentials(); 
+                
+                // 3. UI Setup
                 switchMenu('entry'); 
                 switchMode('website'); 
                 checkPasswordStrength();
-                await checkKeyStatusAndUpdateUI(); 
-                
-                // Event Listeners for Ephemeral Key Timeout
-                const masterInput = document.getElementById('master_password');
-                
-                // 1. Start/Reset timer on input
-                masterInput.addEventListener('input', resetMasterPasswordTimer);
-                
-                // 2. Global listeners to reset the timer on activity
-                window.addEventListener('mousemove', resetMasterPasswordTimer);
-                window.addEventListener('keydown', resetMasterPasswordTimer);
-
-                // 3. Clear the master password when the window loses focus (tab switch/minimize)
-                window.onblur = function() {
-                    if (masterInput.value.length > 0) {
-                        clearMasterPassword();
-                    }
-                };
             }
         };
     </script>

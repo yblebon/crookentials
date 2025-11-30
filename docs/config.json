@@ -17,6 +17,6 @@
         "key_algo_length": 256,
         "hmac_algo_name": "HMAC",
         "hmac_hash_algo": "SHA-256",
-        "master_key_timeout_minutes": 5
+        "master_key_timeout_minutes": 100000
     }
 }
